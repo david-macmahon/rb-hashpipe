@@ -28,11 +28,11 @@
 
 #define Data_Get_HPStruct_Ensure_Detached(self, s) \
   Data_Get_HPStruct(self, s); \
-  if(s->buf) rb_raise(rb_eArgError, "already attached");
+  if(s->buf) rb_raise(rb_eRuntimeError, "already attached");
 
 #define Data_Get_HPStruct_Ensure_Attached(self, s) \
   Data_Get_HPStruct(self, s); \
-  if(!s->buf) rb_raise(rb_eArgError, "not attached");
+  if(!s->buf) rb_raise(rb_eRuntimeError, "not attached");
 
 /*
  * Document-class: Hashpipe::Status
