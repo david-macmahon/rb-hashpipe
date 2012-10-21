@@ -1,0 +1,8 @@
+pkg/
+ext/*.bundle
+ext/*.dll
+ext/*.dylib
+ext/*.o
+ext/*.so
+ext/Makefile
+ext/mkmf.log
