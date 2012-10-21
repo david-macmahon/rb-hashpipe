@@ -51,6 +51,20 @@ rb_hps_alloc(VALUE klass)
   return v;
 }
 
+// This is called by rb_thread_blocking_region withOUT GVL.
+// Returns Qtrue on error, Qfalse on OK.
+static VALUE
+rb_hps_attach_blocking_func(void * s)
+{
+  int rc;
+
+  rc = hashpipe_status_attach(
+      ((struct hashpipe_status *)s)->instance_id,
+      (struct hashpipe_status *)s);
+
+  return rc ? Qtrue : Qfalse;
+}
+
 /*
  * call-seq: attach(instance_id) -> self
  *
@@ -59,16 +73,22 @@ rb_hps_alloc(VALUE klass)
  */
 VALUE rb_hps_attach(VALUE self, VALUE vid)
 {
-  int id, rc;
+  int id;
+  VALUE vrc;
   struct hashpipe_status tmp, *s;
 
   id = NUM2INT(vid);
 
   Data_Get_HPStruct_Ensure_Detached(self, s);
 
-  rc = hashpipe_status_attach(id, &tmp);
+  // Ensure that instance_id field is set
+  tmp.instance_id = id;
 
-  if(rc != 0)
+  vrc = rb_thread_blocking_region(
+      rb_hps_attach_blocking_func, &tmp,
+      RUBY_UBF_PROCESS, NULL);
+
+  if(RTEST(vrc))
     rb_raise(rb_eRuntimeError, "could not attach to instance id %d", id);
 
   memcpy(s, &tmp, sizeof(struct hashpipe_status));
@@ -140,6 +160,16 @@ VALUE rb_hps_instance_id(VALUE self)
   return s->buf ? INT2NUM(s->instance_id) : Qnil;
 }
 
+// This is called by rb_thread_blocking_region withOUT GVL.
+// Returns Qtrue on error, Qfalse on OK.
+static VALUE
+rb_hps_lock_blocking_func(void * s)
+{
+  int rc;
+  rc = hashpipe_status_lock((struct hashpipe_status *)s);
+  return rc ? Qtrue : Qfalse;
+}
+
 /*
  * call-seq: lock -> self
  *
@@ -148,16 +178,17 @@ VALUE rb_hps_instance_id(VALUE self)
  */
 VALUE rb_hps_lock(VALUE self)
 {
-  int rc;
+  VALUE vrc;
   struct hashpipe_status *s;
 
   Data_Get_HPStruct_Ensure_Attached(self, s);
 
-  // TODO Release and reacquire GIL to play nice with other threads
-  rc = hashpipe_status_lock(s);
+  vrc = rb_thread_blocking_region(
+      rb_hps_lock_blocking_func, s,
+      RUBY_UBF_PROCESS, NULL);
 
-  if(rc != 0)
-    rb_sys_fail("lock");
+  if(RTEST(vrc))
+    rb_raise(rb_eRuntimeError, "lock error");
 
   // TODO If block given, yield self to the block and ensure unlock is called
   // after block finishes.
@@ -178,11 +209,10 @@ VALUE rb_hps_unlock(VALUE self)
 
   Data_Get_HPStruct_Ensure_Attached(self, s);
 
-  // TODO: Release and reacquire GIL to play nice with other threads
   rc = hashpipe_status_unlock(s);
 
   if(rc != 0)
-    rb_sys_fail("unlock");
+    rb_raise(rb_eRuntimeError, "unlock error");
 
   return self;
 }
