@@ -10,7 +10,8 @@ require 'hashpipe/version'
 module Hashpipe
   class Status
 
-    alias :[] :hgets
+    alias :[]  :hgets
+    alias :[]= :hputs
 
   end
 end
