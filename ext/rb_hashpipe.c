@@ -21,6 +21,7 @@
 #define hashpipe_status_detach guppi_status_detach
 #define hashpipe_status_lock   guppi_status_lock
 #define hashpipe_status_unlock guppi_status_unlock
+#define hashpipe_status_clear  guppi_status_clear
 #endif // HAVE_TYPE_STRUCT_GUPPI_STATUS
 
 #define Data_Get_HPStruct(self, s) \
@@ -219,6 +220,34 @@ VALUE rb_hps_lock(VALUE self)
     return self;
 }
 
+// This is called by rb_thread_blocking_region withOUT GVL.
+// Returns Qnil always
+static VALUE
+rb_hps_clear_blocking_func(void * s)
+{
+  hashpipe_status_clear((struct hashpipe_status *)s);
+  return Qnil;
+}
+
+/*
+ * call-seq: clear! -> self
+ *
+ * Clears and reinitializes the status buffer.  This call locks the status
+ * buffer internally so #lock need not be called prior to calling #clear!.
+ */
+VALUE rb_hps_clear_bang(VALUE self)
+{
+  struct hashpipe_status *s;
+
+  Data_Get_HPStruct_Ensure_Attached(self, s);
+
+  rb_thread_blocking_region(
+      rb_hps_clear_blocking_func, s,
+      RUBY_UBF_PROCESS, NULL);
+
+  return self;
+}
+
 void Init_hashpipe()
 {
   VALUE mHashpipe;
@@ -235,4 +264,5 @@ void Init_hashpipe()
   rb_define_method(cStatus, "instance_id", rb_hps_instance_id, 0);
   rb_define_method(cStatus, "unlock", rb_hps_unlock, 0);
   rb_define_method(cStatus, "lock", rb_hps_lock, 0);
+  rb_define_method(cStatus, "clear!", rb_hps_clear_bang, 0);
 }
