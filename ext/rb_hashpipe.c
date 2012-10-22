@@ -211,12 +211,12 @@ VALUE rb_hps_lock(VALUE self)
   if(RTEST(vrc))
     rb_raise(rb_eRuntimeError, "lock error");
 
-  // If block given, yield self to the block and ensure unlock is called after
-  // block finishes.
+  // If block given, yield self to the block, ensure unlock is called after
+  // block finishes, and return block's return value.
   if(rb_block_given_p())
-    rb_ensure(rb_yield, self, rb_hps_unlock, self);
-
-  return self;
+    return rb_ensure(rb_yield, self, rb_hps_unlock, self);
+  else
+    return self;
 }
 
 void Init_hashpipe()
