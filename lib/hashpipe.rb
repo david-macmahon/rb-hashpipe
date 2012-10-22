@@ -6,3 +6,11 @@ require hashpipe_shared_lib
 require 'hashpipe_gem' if false # Fake out RDoc
 
 require 'hashpipe/version'
+
+module Hashpipe
+  class Status
+
+    alias :[] :hgets
+
+  end
+end
