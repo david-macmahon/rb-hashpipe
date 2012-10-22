@@ -9,6 +9,7 @@
  */
 
 #include <hashpipe_status.h>
+#include <fitshead.h>
 
 #include "ruby.h"
 
@@ -22,6 +23,7 @@
 #define hashpipe_status_lock   guppi_status_lock
 #define hashpipe_status_unlock guppi_status_unlock
 #define hashpipe_status_clear  guppi_status_clear
+#define HASHPIPE_STATUS_CARD   GUPPI_STATUS_CARD
 #endif // HAVE_TYPE_STRUCT_GUPPI_STATUS
 
 #define Data_Get_HPStruct(self, s) \
@@ -248,6 +250,96 @@ VALUE rb_hps_clear_bang(VALUE self)
   return self;
 }
 
+VALUE rb_hps_buf(VALUE self)
+{
+  int len;
+  struct hashpipe_status *s;
+
+  Data_Get_HPStruct_Ensure_Attached(self, s);
+  len = gethlength(s->buf);
+  return rb_str_new(s->buf, len);
+}
+
+VALUE rb_hps_length(VALUE self)
+{
+  struct hashpipe_status *s;
+  Data_Get_HPStruct_Ensure_Attached(self, s);
+  return UINT2NUM((unsigned int)gethlength(s->buf));
+}
+
+#define HGET(typecode, type, conv) \
+  VALUE rb_hps_hget##typecode(VALUE self, VALUE vkey) \
+  { \
+    int rc; \
+    type val; \
+    struct hashpipe_status *s; \
+    const char * key = StringValueCStr(vkey); \
+    Data_Get_HPStruct_Ensure_Attached(self, s); \
+    rc = hget##typecode(s->buf, key, &val); \
+    return rc ? conv(val) : Qnil; \
+  }
+
+HGET(i2, short, INT2FIX)
+HGET(i4, int, INT2NUM)
+HGET(i8, long long, LL2NUM)
+HGET(u4, unsigned int, UINT2NUM)
+HGET(u8, unsigned long long, ULL2NUM)
+HGET(r4, float, DBL2NUM)
+HGET(r8, double, DBL2NUM)
+
+VALUE rb_hps_hgets(VALUE self, VALUE vkey)
+{
+  int rc;
+  char val[HASHPIPE_STATUS_CARD];
+  struct hashpipe_status *s;
+  const char * key = StringValueCStr(vkey);
+  Data_Get_HPStruct_Ensure_Attached(self, s);
+  rc = hgets(s->buf, key, HASHPIPE_STATUS_CARD, val);
+  val[HASHPIPE_STATUS_CARD-1] = '\0';
+  return rc ? rb_str_new_cstr(val) : Qnil;
+}
+
+#define HPUT(typecode, type, conv) \
+  VALUE rb_hps_hput##typecode(VALUE self, VALUE vkey, VALUE vval) \
+  { \
+    int rc; \
+    struct hashpipe_status *s; \
+    const char * key = StringValueCStr(vkey); \
+    type val = (type)conv(vval); \
+    Data_Get_HPStruct_Ensure_Attached(self, s); \
+    rc = hput##typecode(s->buf, key, val); \
+    return self; \
+  }
+
+HPUT(i2, short, NUM2INT)
+HPUT(i4, int, NUM2INT)
+HPUT(i8, long long, NUM2LL)
+HPUT(u4, unsigned int, NUM2UINT)
+HPUT(u8, unsigned long long, NUM2ULL)
+HPUT(r4, float, NUM2DBL)
+HPUT(r8, double, NUM2DBL)
+
+VALUE rb_hps_hputs(VALUE self, VALUE vkey, VALUE vval)
+{
+  int rc;
+  struct hashpipe_status *s;
+  const char * val = StringValueCStr(vval);
+  const char * key = StringValueCStr(vkey);
+  Data_Get_HPStruct_Ensure_Attached(self, s);
+  rc = hputs(s->buf, key, val);
+  if(rc)
+    // Currently, the only error return is if header length is exceeded
+    rb_raise(rb_eRuntimeError, "header length exceeded");
+
+  return self;
+}
+
+#define HGET_METHOD(klass, typecode) \
+  rb_define_method(klass, "hget"#typecode, rb_hps_hget##typecode, 1);
+
+#define HPUT_METHOD(klass, typecode) \
+  rb_define_method(klass, "hput"#typecode, rb_hps_hput##typecode, 2);
+
 void Init_hashpipe()
 {
   VALUE mHashpipe;
@@ -265,4 +357,26 @@ void Init_hashpipe()
   rb_define_method(cStatus, "unlock", rb_hps_unlock, 0);
   rb_define_method(cStatus, "lock", rb_hps_lock, 0);
   rb_define_method(cStatus, "clear!", rb_hps_clear_bang, 0);
+  rb_define_method(cStatus, "buf", rb_hps_buf, 0);
+  rb_define_method(cStatus, "length", rb_hps_length, 0);
+
+  // hget methods
+  HGET_METHOD(cStatus, i2);
+  HGET_METHOD(cStatus, i4);
+  HGET_METHOD(cStatus, i8);
+  HGET_METHOD(cStatus, u4);
+  HGET_METHOD(cStatus, u8);
+  HGET_METHOD(cStatus, r4);
+  HGET_METHOD(cStatus, r8);
+  HGET_METHOD(cStatus, s);
+
+  // hput methods
+  HPUT_METHOD(cStatus, i2);
+  HPUT_METHOD(cStatus, i4);
+  HPUT_METHOD(cStatus, i8);
+  HPUT_METHOD(cStatus, u4);
+  HPUT_METHOD(cStatus, u8);
+  HPUT_METHOD(cStatus, r4);
+  HPUT_METHOD(cStatus, r8);
+  HPUT_METHOD(cStatus, s);
 }
