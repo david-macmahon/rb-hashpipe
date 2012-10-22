@@ -160,6 +160,27 @@ VALUE rb_hps_instance_id(VALUE self)
   return s->buf ? INT2NUM(s->instance_id) : Qnil;
 }
 
+/*
+ * call-seq: unlock -> self
+ *
+ * Unlocks the status buffer relinguishing exclusive access.  You should always
+ * unlock the status buffer after reading or modifying it.
+ */
+VALUE rb_hps_unlock(VALUE self)
+{
+  int rc;
+  struct hashpipe_status *s;
+
+  Data_Get_HPStruct_Ensure_Attached(self, s);
+
+  rc = hashpipe_status_unlock(s);
+
+  if(rc != 0)
+    rb_raise(rb_eRuntimeError, "unlock error");
+
+  return self;
+}
+
 // This is called by rb_thread_blocking_region withOUT GVL.
 // Returns Qtrue on error, Qfalse on OK.
 static VALUE
@@ -190,29 +211,10 @@ VALUE rb_hps_lock(VALUE self)
   if(RTEST(vrc))
     rb_raise(rb_eRuntimeError, "lock error");
 
-  // TODO If block given, yield self to the block and ensure unlock is called
-  // after block finishes.
-
-  return self;
-}
-
-/*
- * call-seq: unlock -> self
- *
- * Unlocks the status buffer relinguishing exclusive access.  You should always
- * unlock the status buffer after reading or modifying it.
- */
-VALUE rb_hps_unlock(VALUE self)
-{
-  int rc;
-  struct hashpipe_status *s;
-
-  Data_Get_HPStruct_Ensure_Attached(self, s);
-
-  rc = hashpipe_status_unlock(s);
-
-  if(rc != 0)
-    rb_raise(rb_eRuntimeError, "unlock error");
+  // If block given, yield self to the block and ensure unlock is called after
+  // block finishes.
+  if(rb_block_given_p())
+    rb_ensure(rb_yield, self, rb_hps_unlock, self);
 
   return self;
 }
@@ -231,6 +233,6 @@ void Init_hashpipe()
   rb_define_method(cStatus, "detach", rb_hps_detach, 0);
   rb_define_method(cStatus, "attached?", rb_hps_attached_p, 0);
   rb_define_method(cStatus, "instance_id", rb_hps_instance_id, 0);
-  rb_define_method(cStatus, "lock", rb_hps_lock, 0);
   rb_define_method(cStatus, "unlock", rb_hps_unlock, 0);
+  rb_define_method(cStatus, "lock", rb_hps_lock, 0);
 }
