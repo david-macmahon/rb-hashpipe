@@ -326,6 +326,25 @@ VALUE rb_hps_hgets(VALUE self, VALUE vkey)
   return rc ? rb_str_new_cstr(val) : Qnil;
 }
 
+VALUE rb_hps_delete(VALUE self, VALUE vkey)
+{
+  struct hashpipe_status *s;
+  const char * key;
+  VALUE val;
+
+  // Get current value (to be returned)
+  val = rb_hps_hgets(self, vkey);
+  // If found,
+  if(RTEST(val)) {
+    // Delete key
+    key = StringValueCStr(vkey);
+    Data_Get_HPStruct_Ensure_Attached(self, s);
+    hdel(s->buf, key);
+  }
+
+  return val;
+}
+
 #define HPUT(typecode, type, conv) \
   VALUE rb_hps_hput##typecode(VALUE self, VALUE vkey, VALUE vval) \
   { \
@@ -385,6 +404,7 @@ void Init_hashpipe()
   rb_define_method(cStatus, "unlock", rb_hps_unlock, 0);
   rb_define_method(cStatus, "lock", rb_hps_lock, 0);
   rb_define_method(cStatus, "clear!", rb_hps_clear_bang, 0);
+  rb_define_method(cStatus, "delete", rb_hps_delete, 1);
   rb_define_method(cStatus, "buf", rb_hps_buf, 0);
   rb_define_method(cStatus, "length", rb_hps_length, 0);
 
