@@ -25,6 +25,7 @@ spec = Gem::Specification.new do |s|
 
   # Files, Libraries, and Extensions
   s.files = %w[
+    bin/hashpipe_status_monitor.rb
     lib/hashpipe.rb
     lib/hashpipe/version.rb
     ext/extconf.rb
@@ -34,7 +35,9 @@ spec = Gem::Specification.new do |s|
   s.require_paths = ['lib']
   #s.autorequire = nil
   #s.bindir = 'bin'
-  #s.executables = []
+  s.executables = %w[
+    hashpipe_status_monitor.rb
+  ]
   #s.default_executable = nil
 
   # C compilation
