@@ -36,5 +36,10 @@ module Hashpipe
       h
     end # to_hash
 
+    # Return a more user-friendly string than the default.
+    def inspect
+      "#<#{self.class} instance_id=#{instance_id}>"
+    end
+
   end # class Status
 end # module Hashpipe
