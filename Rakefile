@@ -16,6 +16,7 @@ spec = Gem::Specification.new do |s|
     EOD
   #s.platform = Gem::Platform::Ruby
   s.required_ruby_version = '>= 1.8.1'
+  s.add_dependency('redis', '~> 3.0.2')
 
   # About
   s.authors = 'David MacMahon'
@@ -25,6 +26,7 @@ spec = Gem::Specification.new do |s|
 
   # Files, Libraries, and Extensions
   s.files = %w[
+    bin/hashpipe_redis_gateway.rb
     bin/hashpipe_status_monitor.rb
     lib/hashpipe.rb
     lib/hashpipe/version.rb
@@ -36,6 +38,7 @@ spec = Gem::Specification.new do |s|
   #s.autorequire = nil
   #s.bindir = 'bin'
   s.executables = %w[
+    hashpipe_redis_gateway.rb
     hashpipe_status_monitor.rb
   ]
   #s.default_executable = nil
