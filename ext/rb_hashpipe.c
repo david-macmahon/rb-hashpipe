@@ -8,6 +8,7 @@
  * rb_hashpipe.c
  */
 
+#include <errno.h>
 #include <hashpipe_status.h>
 #include <fitshead.h>
 
@@ -84,18 +85,29 @@ VALUE rb_hps_exists(VALUE klass, VALUE vid)
 }
 
 /*
- * call-seq: attach(instance_id) -> self
+ * call-seq: attach(instance_id, create=true) -> self
  *
  * Attaches to the status buffer of Hashpipe * instance given by +instance_id+
- * (Integer).  It is an error to call attach if already attached.
+ * (Integer).  It is an error to call attach if already attached.  If +create+
+ * is false, an exception will be raised if the specified statsu buffer does
+ * not exist.
  */
-VALUE rb_hps_attach(VALUE self, VALUE vid)
+VALUE rb_hps_attach(int argc, VALUE *argv, VALUE self)
 {
-  int id;
+  VALUE vid, vcreate;
+  int id, create;
   VALUE vrc;
   struct hashpipe_status tmp, *s;
 
+  rb_scan_args(argc, argv, "11", &vid, &vcreate);
+
   id = NUM2INT(vid);
+
+  // Raise exception if vcreate is given and is false and specified buffer does
+  // not exist.
+  if(argc == 2 && !RTEST(vcreate) && !hashpipe_status_exists(id)) {
+    rb_syserr_fail(ENOENT, "status buffer does not exist for given instance");
+  }
 
   Data_Get_HPStruct_Ensure_Detached(self, s);
 
@@ -115,14 +127,14 @@ VALUE rb_hps_attach(VALUE self, VALUE vid)
 }
 
 /*
- * call-seq: Status.new(instance_id) -> Status
+ * call-seq: Status.new(instance_id, create=true) -> Status
  *
  * Creates a Status object that is attached to the status buffer of Hashpipe
  * instance given by +instance_id+ (Integer).
  */
-VALUE rb_hps_init(VALUE self, VALUE vid)
+VALUE rb_hps_init(int argc, VALUE *argv, VALUE self)
 {
-  return rb_hps_attach(self, vid);
+  return rb_hps_attach(argc, argv, self);
 }
 
 /*
@@ -364,9 +376,9 @@ void Init_hashpipe()
   cStatus = rb_define_class_under(mHashpipe, "Status", rb_cObject);
 
   rb_define_alloc_func(cStatus, rb_hps_alloc);
-  rb_define_method(cStatus, "initialize", rb_hps_init, 1);
-  rb_define_method(cStatus, "attach", rb_hps_attach, 1);
   rb_define_singleton_method(cStatus, "exists?", rb_hps_exists, 1);
+  rb_define_method(cStatus, "initialize", rb_hps_init, -1);
+  rb_define_method(cStatus, "attach", rb_hps_attach, -1);
   rb_define_method(cStatus, "detach", rb_hps_detach, 0);
   rb_define_method(cStatus, "attached?", rb_hps_attached_p, 0);
   rb_define_method(cStatus, "instance_id", rb_hps_instance_id, 0);
