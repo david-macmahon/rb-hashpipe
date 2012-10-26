@@ -18,6 +18,7 @@
  */
 #ifdef HAVE_TYPE_STRUCT_GUPPI_STATUS
 #define hashpipe_status        guppi_status
+#define hashpipe_status_exists guppi_status_exists
 #define hashpipe_status_attach guppi_status_attach
 #define hashpipe_status_detach guppi_status_detach
 #define hashpipe_status_lock   guppi_status_lock
@@ -65,6 +66,20 @@ rb_hps_attach_blocking_func(void * s)
       ((struct hashpipe_status *)s)->instance_id,
       (struct hashpipe_status *)s);
 
+  return rc ? Qtrue : Qfalse;
+}
+
+/*
+ * call-seq: Status.exists?(instance_id) -> boolean
+ *
+ * Returns true if the status buffer for the instance given by +instance_id+
+ * already exists.
+ */
+VALUE rb_hps_exists(VALUE klass, VALUE vid)
+{
+  int id, rc;
+  id = NUM2INT(vid);
+  rc = hashpipe_status_exists(id);
   return rc ? Qtrue : Qfalse;
 }
 
@@ -351,6 +366,7 @@ void Init_hashpipe()
   rb_define_alloc_func(cStatus, rb_hps_alloc);
   rb_define_method(cStatus, "initialize", rb_hps_init, 1);
   rb_define_method(cStatus, "attach", rb_hps_attach, 1);
+  rb_define_singleton_method(cStatus, "exists?", rb_hps_exists, 1);
   rb_define_method(cStatus, "detach", rb_hps_detach, 0);
   rb_define_method(cStatus, "attached?", rb_hps_attached_p, 0);
   rb_define_method(cStatus, "instance_id", rb_hps_instance_id, 0);
