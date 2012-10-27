@@ -80,6 +80,7 @@ OPTS = {
   :gwname       => Socket.gethostname,
   :notify       => false,
   :server       => 'redishost',
+  :expire       => true,
 }
 
 OP = OptionParser.new do |op|
@@ -116,6 +117,10 @@ OP = OptionParser.new do |op|
   op.on('-s', '--server=NAME',
         "Host running redis-server [#{OPTS[:server]}]") do |o|
     OPTS[:server] = o
+  end
+  op.on('-x', '--no-expire',
+        "Disable expiration of redis keys") do |o|
+    OPTS[:expire] = o
   end
   op.separator('')
   op.on_tail('-h','--help','Show this message') do
@@ -214,7 +219,7 @@ def update_redis(redis, instance_ids, notify=false)
         redis.del(key)
         redis.mapped_hmset(key, sb.to_hash)
         # Expire time must be integer, we always round up
-        redis.expire(key, (3*OPTS[:delay]).ceil)
+        redis.expire(key, (3*OPTS[:delay]).ceil) if OPTS[:expire]
         if notify
           # Publish "updated" method to notify subscribers
           channel = "hashpipe://#{OPTS[:gwname]}/#{iid}/update"
