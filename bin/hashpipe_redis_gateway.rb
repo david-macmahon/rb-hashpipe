@@ -102,7 +102,7 @@ OP = OptionParser.new do |op|
     OPTS[:delay] = o
   end
   op.on('-g', '--gwname=GWNAME',
-        "Gateway name [#{OPTS[:gwname]}]") do |o|
+        "Name of this gateway [#{OPTS[:gwname]}]") do |o|
     OPTS[:gwname] = o
   end
   op.on('-i', '--instances=I[,...]', Array,
