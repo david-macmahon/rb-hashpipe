@@ -74,10 +74,11 @@ require 'redis'
 require 'hashpipe'
 
 OPTS = {
-  :delay     => 1.0,
-  :instances => (0..3),
-  :gwname    => Socket.gethostname,
-  :server    => 'redishost',
+  :create       => false,
+  :delay        => 1.0,
+  :instances    => (0..3),
+  :gwname       => Socket.gethostname,
+  :server       => 'redishost',
 }
 
 OP = OptionParser.new do |op|
@@ -88,6 +89,10 @@ OP = OptionParser.new do |op|
   op.separator('Gateway between Hashpipe status buffers and Redis server.')
   op.separator('')
   op.separator('Options:')
+  op.on('-c', '--[no-]create',
+        "Create missing status buffers [#{OPTS[:create]}]") do |o|
+    OPTS[:create] = o
+  end
   op.on('-d', '--delay=SECONDS', Float,
         "Delay between updates (0.25-60) [#{OPTS[:delay]}]") do |o|
     o = 0.25 if o < 0.25
@@ -114,13 +119,13 @@ OP = OptionParser.new do |op|
   end
 end
 OP.parse!
-
+#p OPTS; exit
 
 # STATUS_BUFS maps instance id (String or Integer) to Hashpipe::Status object.
 STATUS_BUFS = {}
 # Create Hashpipe::Status objects
 OPTS[:instances].each do |i|
-  if hps = Hashpipe::Status.new(i, false) rescue nil
+  if hps = Hashpipe::Status.new(i, OPTS[:create]) rescue nil
     STATUS_BUFS[i] = hps
     STATUS_BUFS["#{i}"] = hps
   end
