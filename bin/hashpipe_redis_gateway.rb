@@ -5,14 +5,59 @@
 #
 # The contents of Hashpipe status buffer are periodically sent to Redis.  A
 # redis hash is used to hold the Ruby hash returned by Status#to_hash.  The key
-# used to refer to the redis hash is host/instance specific so status buffer
-# hashes for multiple hosts and instances can all be stored in one Redis
-# instance.
+# used to refer to the redis hash is gateway/instance specific so status buffer
+# hashes for multiple gateways and instances can all be stored in one Redis
+# instance.  The updated key is also published on the "update channel".  The
+# gateway name is typically the name of the gateway's host, but it need not be.
+#
+# Key format:
+#
+#   "hashpipe://#{gwname}/#{instance_id}/status"
+#
+#   Example: hashpipe://px1/0/status
+#
+# Update channel format:
+#
+#   "hashpipe://#{gwname}/#{instance_id}/update"
+#
+#   Example: hashpipe://px1/0/update
 #
 # Additionally, a thread is started that subscribes to "command channels" so
 # that key/value pairs can be published via Redis.  Recevied key/value pairs
 # are stored in the status buffers as appropriate for the channel on which they
-# arrive.
+# arrive.  Each gateway instance subscribes to multiple command channels:
+# status buffer specific "set" channels, the broadcast "set" channel, and a
+# gateway specific "command" channel.
+#
+# Status buffer "set" channels are used to set fields in a specific status
+# buffer instance.  The format of the status buffer specific "set" channel is:
+#
+#   "hashpipe://#{gwname}/#{instance_id}/set"
+#
+#   Example: hashpipe://px1/0/set
+#
+# The broadcast "set" channel is used to set fields in all status buffer
+# instances.  The broadcast "set" channel is:
+#
+#   "hashpipe:///set"
+#
+# Messages sent to "set" channels are expected to be in "key=value" format with
+# multiple key/value pairs separated by newlines ("\n").
+#
+# The gateway command channel is used to send commands to the gateway itself.
+# The format of the gateway command channel is:
+#
+#   "hashpipe://#{gwname}/command"
+#
+#   Example: hashpipe://px1/command
+#
+# Messages sent to "set" channels are expected to be in "command=args" format with
+# multiple command/args pairs separated by newlines ("\n").  The format of args
+# is command specific.  Currently, only one command is supported:
+#
+#   delay=SECONDS - Sets the delay between updates to SECONDS seconds.  Note
+#                   that SECONDS is interpreted as a floating point number
+#                   (e.g. "0.25").
 
 require 'rubygems'
 require 'optparse'
@@ -55,17 +100,6 @@ OP.parse!
 # Updates redis with contents of status_bufs and publishes each statusbuf's key
 # on its "update" channel (if +publish+ is true).
 #
-# Key format:
-#
-#   "hashpipe://#{name}/#{instance_id}/status"
-#
-#   Example: hashpipe://px1/0/status
-#
-# Update channel format:
-#
-#   "hashpipe://#{name}/#{instance_id}/update"
-#
-#   Example: : hashpipe://px1/0/update
 def update_redis(redis, status_bufs, publish=false)
   # Pipeline all status buffer updates
   redis.pipelined do
