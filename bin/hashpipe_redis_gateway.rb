@@ -66,9 +66,9 @@ require 'redis'
 require 'hashpipe'
 
 OPTS = {
-  :delay     => 0.25,
+  :delay     => 1.0,
   :instances => (0..3),
-  :name      => Socket.gethostname,
+  :gwname    => Socket.gethostname,
   :server    => 'redishost',
 }
 
@@ -80,22 +80,26 @@ OP = OptionParser.new do |op|
   op.separator('Gateway between Hashpipe status buffers and Redis server.')
   op.separator('')
   op.separator('Options:')
-  op.on('-d', '--delay=SECONDS', Float, "Delay between updates (0.25-60) [#{OPTS[:delay]}]") do |o|
+  op.on('-d', '--delay=SECONDS', Float,
+        "Delay between updates (0.25-60) [#{OPTS[:delay]}]") do |o|
     o = 0.25 if o < 0.25
     o = 60.0 if o > 60.0
     OPTS[:delay] = o
   end
-  op.on('-i', '--instances=NX,...', Array, "Instances to gateway [#{OPTS[:instances]}]") do |o|
+  op.on('-g', '--gwname=GWNAME',
+        "Gateway name [#{OPTS[:gwname]}]") do |o|
+    OPTS[:gwname] = o
+  end
+  op.on('-i', '--instances=I[,...]', Array,
+        "Instances to gateway [#{OPTS[:instances]}]") do |o|
     OPTS[:instances] = o.map {|s| Integer(s) rescue 0}
     OPTS[:instances].uniq!
   end
-  op.on('-n', '--name=NAME', "Alternate name to use in keys [#{OPTS[:name]}]") do |o|
-    OPTS[:name] = o
-  end
-  op.on('-s', '--server=NAME', "Name of host running redis-server [#{OPTS[:server]}]") do |o|
+  op.on('-s', '--server=NAME',
+        "Host running redis-server [#{OPTS[:server]}]") do |o|
     OPTS[:server] = o
   end
-  #op.separator('')
+  op.separator('')
   op.on_tail('-h','--help','Show this message') do
     puts op.help
     exit
@@ -112,12 +116,12 @@ def update_redis(redis, status_bufs, publish=false)
     status_bufs.each do |sb|
       # Each status buffer update happens in a transaction
       redis.multi do
-        key = "hashpipe://#{OPTS[:name]}/#{sb.instance_id}/status"
+        key = "hashpipe://#{OPTS[:gwname]}/#{sb.instance_id}/status"
         redis.del(key)
         redis.mapped_hmset(key, sb.to_hash)
         if publish
           # Publish "updated" method to notify subscribers
-          channel = "hashpipe://#{OPTS[:name]}/#{sb.instance_id}/update"
+          channel = "hashpipe://#{OPTS[:gwname]}/#{sb.instance_id}/update"
           redis.publish channel, key
         end
       end # redis.multi
