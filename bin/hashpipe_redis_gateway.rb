@@ -208,7 +208,8 @@ def update_redis(redis, instance_ids, notify=false)
         key = "hashpipe://#{OPTS[:gwname]}/#{iid}/status"
         redis.del(key)
         redis.mapped_hmset(key, sb.to_hash)
-        redis.expire(key, 3*OPTS[:delay])
+        # Expire time must be integer, we always round up
+        redis.expire(key, (3*OPTS[:delay]).ceil)
         if notify
           # Publish "updated" method to notify subscribers
           channel = "hashpipe://#{OPTS[:gwname]}/#{iid}/update"
