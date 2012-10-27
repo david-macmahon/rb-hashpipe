@@ -76,7 +76,7 @@ require 'hashpipe'
 OPTS = {
   :create       => false,
   :delay        => 1.0,
-  :instances    => (0..3),
+  :instance_ids => (0..3),
   :gwname       => Socket.gethostname,
   :server       => 'redishost',
 }
@@ -104,9 +104,9 @@ OP = OptionParser.new do |op|
     OPTS[:gwname] = o
   end
   op.on('-i', '--instances=I[,...]', Array,
-        "Instances to gateway [#{OPTS[:instances]}]") do |o|
-    OPTS[:instances] = o.map {|s| Integer(s) rescue 0}
-    OPTS[:instances].uniq!
+        "Instances to gateway [#{OPTS[:instance_ids]}]") do |o|
+    OPTS[:instance_ids] = o.map {|s| Integer(s) rescue 0}
+    OPTS[:instance_ids].uniq!
   end
   op.on('-s', '--server=NAME',
         "Host running redis-server [#{OPTS[:server]}]") do |o|
@@ -124,16 +124,30 @@ OP.parse!
 # STATUS_BUFS maps instance id (String or Integer) to Hashpipe::Status object.
 STATUS_BUFS = {}
 # Create Hashpipe::Status objects
-OPTS[:instances].each do |i|
-  if hps = Hashpipe::Status.new(i, OPTS[:create]) rescue nil
+instance_ids = []
+OPTS[:instance_ids].each do |i|
+  hps = Hashpipe::Status.new(i, OPTS[:create]) rescue nil
+  if hps
+    instance_ids << i
     STATUS_BUFS[i] = hps
     STATUS_BUFS["#{i}"] = hps
   end
 end
 #p STATUS_BUFS; exit
 
+# If we got nothing, exit
+if instance_ids.empty?
+  puts "No status buffers to gateway"
+  exit 1
+end
+
+puts "Gateway Hashpipe instances #{instance_ids.join(',')}"
+
+# Set OPTS[:instance_ids] to those that we have
+OPTS[:instance_ids] = instance_ids
+
 # Create subscribe channel names
-SBSET_CHANNELS = OPTS[:instances].map do |i|
+SBSET_CHANNELS = OPTS[:instance_ids].map do |i|
   "hashpipe://#{OPTS[:gwname]}/#{i}/set"
 end
 BCASTSET_CHANNEL = 'hashpipe:///set'
@@ -151,7 +165,7 @@ Thread.new do
       # Set channels
       when BCASTSET_CHANNEL, *SBSET_CHANNELS
         insts = case chan
-                when BCASTSET_CHANNEL; OPTS[:instances]
+                when BCASTSET_CHANNEL; OPTS[:instance_ids]
                 when %r{/(\w+)/set}; [$1]
                 end
 
@@ -182,21 +196,22 @@ Thread.new do
 end # subscribe thread
 
 # Updates redis with contents of status_bufs and publishes each statusbuf's key
-# on its "update" channel (if +publish+ is true).
+# on its "update" channel (if +notify+ is true).
 #
-def update_redis(redis, status_bufs, publish=false)
+def update_redis(redis, instance_ids, notify=false)
   # Pipeline all status buffer updates
   redis.pipelined do
-    status_bufs.each do |sb|
+    instance_ids.each do |iid|
+      sb = STATUS_BUFS[iid]
       # Each status buffer update happens in a transaction
       redis.multi do
-        key = "hashpipe://#{OPTS[:gwname]}/#{sb.instance_id}/status"
+        key = "hashpipe://#{OPTS[:gwname]}/#{iid}/status"
         redis.del(key)
         redis.mapped_hmset(key, sb.to_hash)
         redis.expire(key, 3*OPTS[:delay])
-        if publish
+        if notify
           # Publish "updated" method to notify subscribers
-          channel = "hashpipe://#{OPTS[:gwname]}/#{sb.instance_id}/update"
+          channel = "hashpipe://#{OPTS[:gwname]}/#{iid}/update"
           redis.publish channel, key
         end
       end # redis.multi
@@ -209,7 +224,7 @@ redis = Redis.new(:host => OPTS[:server])
 
 # Loop "forever"
 while
-  update_redis(redis, STATUS_BUFS)
+  update_redis(redis, OPTS[:instance_ids])
   # Delay before doing it again
   sleep OPTS[:delay]
 end
