@@ -115,6 +115,67 @@ OP = OptionParser.new do |op|
 end
 OP.parse!
 
+
+# STATUS_BUFS maps instance id (String or Integer) to Hashpipe::Status object.
+STATUS_BUFS = {}
+# Create Hashpipe::Status objects
+OPTS[:instances].each do |i|
+  if hps = Hashpipe::Status.new(i, false) rescue nil
+    STATUS_BUFS[i] = hps
+    STATUS_BUFS["#{i}"] = hps
+  end
+end
+#p STATUS_BUFS; exit
+
+# Create subscribe channel names
+SBSET_CHANNELS = OPTS[:instances].map do |i|
+  "hashpipe://#{OPTS[:gwname]}/#{i}/set"
+end
+BCASTSET_CHANNEL = 'hashpipe:///set'
+GWCMD_CHANNEL = "hashpipe://#{OPTS[:gwname]}/gateway"
+BCASTCMD_CHANNEL = 'hashpipe:///gateway'
+
+# Create subscribe thread
+Thread.new do
+  # Create Redis object for subscribing
+  subscriber = Redis.new(:host => OPTS[:server])
+  subscriber.subscribe(BCASTSET_CHANNEL, BCASTCMD_CHANNEL,
+                       GWCMD_CHANNEL, *SBSET_CHANNELS) do |on|
+    on.message do |chan, msg|
+      case chan
+      # Set channels
+      when BCASTSET_CHANNEL, *SBSET_CHANNELS
+        insts = case chan
+                when BCASTSET_CHANNEL; OPTS[:instances]
+                when %r{/(\w+)/set}; [$1]
+                end
+
+        pairs = msg.split("\n").map {|s| s.split('=')}
+        insts.each do |i|
+          sb = STATUS_BUFS[i]
+          pairs.each {|k,v| sb[k] = v}
+        end
+
+      # Gateway channels
+      when BCASTCMD_CHANNEL, GWCMD_CHANNEL
+        pairs = msg.split("\n").map {|s| s.split('=')}
+        pairs.each do |k,v|
+          case k
+          when 'delay', 'DELAY'
+            delay = Float(v) rescue 1.0
+            delay = 0.25 if delay < 0.25
+            delay = 60.0 if delay > 60.0
+            OPTS[:delay] = delay
+            # Wake up main thread
+            Thread.main.wakeup
+          end
+        end
+
+      end # case chan
+    end # on.message
+  end # subcribe
+end # subscribe thread
+
 # Updates redis with contents of status_bufs and publishes each statusbuf's key
 # on its "update" channel (if +publish+ is true).
 #
@@ -141,14 +202,9 @@ end # def update_redis
 # Create Redis object
 redis = Redis.new(:host => OPTS[:server])
 
-# Create Hashpipe::Status objects
-status_bufs = OPTS[:instances].map {|i| Hashpipe::Status.new(i, false) rescue nil}
-status_bufs.compact!
-#p status_bufs
-
 # Loop "forever"
 while
-  update_redis(redis, status_bufs)
+  update_redis(redis, STATUS_BUFS)
   # Delay before doing it again
   sleep OPTS[:delay]
 end
