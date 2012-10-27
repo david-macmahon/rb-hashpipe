@@ -7,10 +7,12 @@
 # redis hash is used to hold the Ruby hash returned by Status#to_hash.  The key
 # used to refer to the redis hash is gateway/instance specific so status buffer
 # hashes for multiple gateways and instances can all be stored in one Redis
-# instance.  The updated key is also published on the "update channel".  The
-# gateway name is typically the name of the gateway's host, but it need not be.
+# instance.  This key is known as the "status key".  When updated, the status
+# key is also published on the "update channel".  The status key is set to
+# expire after three times the delay interval.  The gateway name is typically
+# the name of the gateway's host, but it need not be.
 #
-# Key format:
+# Status key format:
 #
 #   "hashpipe://#{gwname}/#{instance_id}/status"
 #
@@ -26,8 +28,8 @@
 # that key/value pairs can be published via Redis.  Recevied key/value pairs
 # are stored in the status buffers as appropriate for the channel on which they
 # arrive.  Each gateway instance subscribes to multiple command channels:
-# status buffer specific "set" channels, the broadcast "set" channel, and a
-# gateway specific "command" channel.
+# status buffer specific "set" channels, the broadcast "set" channel, a
+# gateway specific "command" channel, and the broadcast "command" channel.
 #
 # Status buffer "set" channels are used to set fields in a specific status
 # buffer instance.  The format of the status buffer specific "set" channel is:
@@ -47,13 +49,19 @@
 # The gateway command channel is used to send commands to the gateway itself.
 # The format of the gateway command channel is:
 #
-#   "hashpipe://#{gwname}/command"
+#   "hashpipe://#{gwname}/gateway"
 #
-#   Example: hashpipe://px1/command
+#   Example: hashpipe://px1/gateway
 #
-# Messages sent to "set" channels are expected to be in "command=args" format with
-# multiple command/args pairs separated by newlines ("\n").  The format of args
-# is command specific.  Currently, only one command is supported:
+# The broadcast command channel is used to send commands to all gateways.  The
+# broadcast command channel is:
+#
+#   "hashpipe:///gateway"
+#
+# Messages sent to gateway command channels are expected to be in
+# "command=args" format with multiple command/args pairs separated by newlines
+# ("\n").  The format of args is command specific.  Currently, only one command
+# is supported:
 #
 #   delay=SECONDS - Sets the delay between updates to SECONDS seconds.  Note
 #                   that SECONDS is interpreted as a floating point number
@@ -119,6 +127,7 @@ def update_redis(redis, status_bufs, publish=false)
         key = "hashpipe://#{OPTS[:gwname]}/#{sb.instance_id}/status"
         redis.del(key)
         redis.mapped_hmset(key, sb.to_hash)
+        redis.expire(key, 3*OPTS[:delay])
         if publish
           # Publish "updated" method to notify subscribers
           channel = "hashpipe://#{OPTS[:gwname]}/#{sb.instance_id}/update"
