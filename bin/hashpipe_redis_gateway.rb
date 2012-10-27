@@ -78,6 +78,7 @@ OPTS = {
   :delay        => 1.0,
   :instance_ids => (0..3),
   :gwname       => Socket.gethostname,
+  :notify       => false,
   :server       => 'redishost',
 }
 
@@ -107,6 +108,10 @@ OP = OptionParser.new do |op|
         "Instances to gateway [#{OPTS[:instance_ids]}]") do |o|
     OPTS[:instance_ids] = o.map {|s| Integer(s) rescue 0}
     OPTS[:instance_ids].uniq!
+  end
+  op.on('-n', '--[no-]notify',
+        "Publish update notifications [#{OPTS[:notify]}]") do |o|
+    OPTS[:notify] = o
   end
   op.on('-s', '--server=NAME',
         "Host running redis-server [#{OPTS[:server]}]") do |o|
@@ -225,7 +230,7 @@ redis = Redis.new(:host => OPTS[:server])
 
 # Loop "forever"
 while
-  update_redis(redis, OPTS[:instance_ids])
+  update_redis(redis, OPTS[:instance_ids], OPTS[:notify])
   # Delay before doing it again
   sleep OPTS[:delay]
 end
