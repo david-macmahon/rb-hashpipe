@@ -66,9 +66,10 @@ require 'redis'
 require 'hashpipe'
 
 OPTS = {
+  :delay     => 0.25,
   :instances => (0..3),
-  :name    => Socket.gethostname,
-  :server  => 'redishost',
+  :name      => Socket.gethostname,
+  :server    => 'redishost',
 }
 
 OP = OptionParser.new do |op|
@@ -79,6 +80,11 @@ OP = OptionParser.new do |op|
   op.separator('Gateway between Hashpipe status buffers and Redis server.')
   op.separator('')
   op.separator('Options:')
+  op.on('-d', '--delay=SECONDS', Float, "Delay between updates (0.25-60) [#{OPTS[:delay]}]") do |o|
+    o = 0.25 if o < 0.25
+    o = 60.0 if o > 60.0
+    OPTS[:delay] = o
+  end
   op.on('-i', '--instances=NX,...', Array, "Instances to gateway [#{OPTS[:instances]}]") do |o|
     OPTS[:instances] = o.map {|s| Integer(s) rescue 0}
     OPTS[:instances].uniq!
@@ -130,6 +136,6 @@ status_bufs.compact!
 # Loop "forever"
 while
   update_redis(redis, status_bufs)
-  # Do it again in 0.25 seconds
-  sleep 0.25
+  # Delay before doing it again
+  sleep OPTS[:delay]
 end
