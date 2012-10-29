@@ -29,6 +29,7 @@ spec = Gem::Specification.new do |s|
     bin/hashpipe_redis_gateway.rb
     bin/hashpipe_status_monitor.rb
     lib/hashpipe.rb
+    lib/hashpipe/keys.rb
     lib/hashpipe/version.rb
     ext/extconf.rb
     ext/rb_hashpipe.c
