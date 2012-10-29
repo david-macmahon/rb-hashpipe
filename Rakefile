@@ -27,6 +27,7 @@ spec = Gem::Specification.new do |s|
   # Files, Libraries, and Extensions
   s.files = %w[
     bin/hashpipe_redis_gateway.rb
+    bin/hashpipe_redis_monitor.rb
     bin/hashpipe_status_monitor.rb
     lib/hashpipe.rb
     lib/hashpipe/keys.rb
@@ -40,6 +41,7 @@ spec = Gem::Specification.new do |s|
   #s.bindir = 'bin'
   s.executables = %w[
     hashpipe_redis_gateway.rb
+    hashpipe_redis_monitor.rb
     hashpipe_status_monitor.rb
   ]
   #s.default_executable = nil
