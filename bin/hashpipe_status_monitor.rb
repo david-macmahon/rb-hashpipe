@@ -157,7 +157,7 @@ def display_status(stat, instance_id)
 end # display_status
 
 # Get instance_id
-instance_id = Integer(ARGV[1]) rescue 0
+instance_id = Integer(ARGV[0]) rescue 0
 
 # Connect to Hashpipe status buffer
 begin
