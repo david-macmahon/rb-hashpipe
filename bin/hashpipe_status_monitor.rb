@@ -122,7 +122,7 @@ def display_status(stat, instance_id)
         c = c.ord - '0'.ord
         if c != instance_id
           begin
-            stat = Hshpipe::Status.new(c, false)
+            stat = Hashpipe::Status.new(c, false)
             instance_id = c
           rescue
             addstr(stdscr, stdscr.maxy-2, col,
