@@ -20,15 +20,11 @@ dir_config('hashpipe')
 # Check for hashpipe_status.h header
 exit unless have_header('hashpipe_status.h')
 
-# Check for old "struct guppi_status" name
-have_type('struct guppi_status', 'hashpipe_status.h')
-
 # Check for libhashpipestatus library.  Need to include rb_run_threads.c so
 # test program will define global run_threads variable needed by
 # libhashpipestatus.
 exit unless have_library('hashpipestatus',
-                         'guppi_status_attach',
-                         'rb_run_threads.c')
+                         'hashpipe_status_attach')
 
 # Generate Makefile
 create_makefile("hashpipe")

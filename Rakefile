@@ -34,7 +34,6 @@ spec = Gem::Specification.new do |s|
     lib/hashpipe/version.rb
     ext/extconf.rb
     ext/rb_hashpipe.c
-    ext/rb_run_threads.c
   ]
   s.require_paths = ['lib']
   #s.autorequire = nil

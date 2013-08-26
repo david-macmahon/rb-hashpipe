@@ -14,22 +14,8 @@
 
 #include "ruby.h"
 
-/*
- * If using old GUPPI names, define macros.
- */
-#ifdef HAVE_TYPE_STRUCT_GUPPI_STATUS
-#define hashpipe_status        guppi_status
-#define hashpipe_status_exists guppi_status_exists
-#define hashpipe_status_attach guppi_status_attach
-#define hashpipe_status_detach guppi_status_detach
-#define hashpipe_status_lock   guppi_status_lock
-#define hashpipe_status_unlock guppi_status_unlock
-#define hashpipe_status_clear  guppi_status_clear
-#define HASHPIPE_STATUS_CARD   GUPPI_STATUS_CARD
-#endif // HAVE_TYPE_STRUCT_GUPPI_STATUS
-
 #define Data_Get_HPStruct(self, s) \
-  Data_Get_Struct(self, struct hashpipe_status, s);
+  Data_Get_Struct(self, hashpipe_status_t, s);
 
 #define Data_Get_HPStruct_Ensure_Detached(self, s) \
   Data_Get_HPStruct(self, s); \
@@ -48,11 +34,11 @@
 static VALUE
 rb_hps_alloc(VALUE klass)
 {
-  struct hashpipe_status * p;
+  hashpipe_status_t * p;
   VALUE v;
   
-  v = Data_Make_Struct(klass, struct hashpipe_status, 0, free, p);
-  memset(p, 0, sizeof(struct hashpipe_status));
+  v = Data_Make_Struct(klass, hashpipe_status_t, 0, free, p);
+  memset(p, 0, sizeof(hashpipe_status_t));
   return v;
 }
 
@@ -64,8 +50,8 @@ rb_hps_attach_blocking_func(void * s)
   int rc;
 
   rc = hashpipe_status_attach(
-      ((struct hashpipe_status *)s)->instance_id,
-      (struct hashpipe_status *)s);
+      ((hashpipe_status_t *)s)->instance_id,
+      (hashpipe_status_t *)s);
 
   return rc ? Qtrue : Qfalse;
 }
@@ -97,7 +83,7 @@ VALUE rb_hps_attach(int argc, VALUE *argv, VALUE self)
   VALUE vid, vcreate;
   int id, create;
   VALUE vrc;
-  struct hashpipe_status tmp, *s;
+  hashpipe_status_t tmp, *s;
 
   rb_scan_args(argc, argv, "11", &vid, &vcreate);
 
@@ -121,7 +107,7 @@ VALUE rb_hps_attach(int argc, VALUE *argv, VALUE self)
   if(RTEST(vrc))
     rb_raise(rb_eRuntimeError, "could not attach to instance id %d", id);
 
-  memcpy(s, &tmp, sizeof(struct hashpipe_status));
+  memcpy(s, &tmp, sizeof(hashpipe_status_t));
 
   return self;
 }
@@ -146,7 +132,7 @@ VALUE rb_hps_init(int argc, VALUE *argv, VALUE self)
 VALUE rb_hps_detach(VALUE self)
 {
   int rc;
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
 
   Data_Get_HPStruct(self, s);
 
@@ -169,7 +155,7 @@ VALUE rb_hps_detach(VALUE self)
  */
 VALUE rb_hps_attached_p(VALUE self)
 {
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
 
   Data_Get_HPStruct(self, s);
 
@@ -183,7 +169,7 @@ VALUE rb_hps_attached_p(VALUE self)
  */
 VALUE rb_hps_instance_id(VALUE self)
 {
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
 
   Data_Get_HPStruct(self, s);
 
@@ -199,7 +185,7 @@ VALUE rb_hps_instance_id(VALUE self)
 VALUE rb_hps_unlock(VALUE self)
 {
   int rc;
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
 
   Data_Get_HPStruct_Ensure_Attached(self, s);
 
@@ -217,7 +203,7 @@ static VALUE
 rb_hps_lock_blocking_func(void * s)
 {
   int rc;
-  rc = hashpipe_status_lock((struct hashpipe_status *)s);
+  rc = hashpipe_status_lock((hashpipe_status_t *)s);
   return rc ? Qtrue : Qfalse;
 }
 
@@ -230,7 +216,7 @@ rb_hps_lock_blocking_func(void * s)
 VALUE rb_hps_lock(VALUE self)
 {
   VALUE vrc;
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
 
   Data_Get_HPStruct_Ensure_Attached(self, s);
 
@@ -254,7 +240,7 @@ VALUE rb_hps_lock(VALUE self)
 static VALUE
 rb_hps_clear_blocking_func(void * s)
 {
-  hashpipe_status_clear((struct hashpipe_status *)s);
+  hashpipe_status_clear((hashpipe_status_t *)s);
   return Qnil;
 }
 
@@ -266,7 +252,7 @@ rb_hps_clear_blocking_func(void * s)
  */
 VALUE rb_hps_clear_bang(VALUE self)
 {
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
 
   Data_Get_HPStruct_Ensure_Attached(self, s);
 
@@ -280,7 +266,7 @@ VALUE rb_hps_clear_bang(VALUE self)
 VALUE rb_hps_buf(VALUE self)
 {
   int len;
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
 
   Data_Get_HPStruct_Ensure_Attached(self, s);
   len = gethlength(s->buf);
@@ -289,7 +275,7 @@ VALUE rb_hps_buf(VALUE self)
 
 VALUE rb_hps_length(VALUE self)
 {
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
   Data_Get_HPStruct_Ensure_Attached(self, s);
   return UINT2NUM((unsigned int)gethlength(s->buf));
 }
@@ -299,7 +285,7 @@ VALUE rb_hps_length(VALUE self)
   { \
     int rc; \
     type val; \
-    struct hashpipe_status *s; \
+    hashpipe_status_t *s; \
     const char * key = StringValueCStr(vkey); \
     Data_Get_HPStruct_Ensure_Attached(self, s); \
     rc = hget##typecode(s->buf, key, &val); \
@@ -317,18 +303,18 @@ HGET(r8, double, DBL2NUM)
 VALUE rb_hps_hgets(VALUE self, VALUE vkey)
 {
   int rc;
-  char val[HASHPIPE_STATUS_CARD];
-  struct hashpipe_status *s;
+  char val[HASHPIPE_STATUS_RECORD_SIZE];
+  hashpipe_status_t *s;
   const char * key = StringValueCStr(vkey);
   Data_Get_HPStruct_Ensure_Attached(self, s);
-  rc = hgets(s->buf, key, HASHPIPE_STATUS_CARD, val);
-  val[HASHPIPE_STATUS_CARD-1] = '\0';
+  rc = hgets(s->buf, key, HASHPIPE_STATUS_RECORD_SIZE, val);
+  val[HASHPIPE_STATUS_RECORD_SIZE-1] = '\0';
   return rc ? rb_str_new_cstr(val) : Qnil;
 }
 
 VALUE rb_hps_delete(VALUE self, VALUE vkey)
 {
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
   const char * key;
   VALUE val;
 
@@ -349,7 +335,7 @@ VALUE rb_hps_delete(VALUE self, VALUE vkey)
   VALUE rb_hps_hput##typecode(VALUE self, VALUE vkey, VALUE vval) \
   { \
     int rc; \
-    struct hashpipe_status *s; \
+    hashpipe_status_t *s; \
     const char * key = StringValueCStr(vkey); \
     type val = (type)conv(vval); \
     Data_Get_HPStruct_Ensure_Attached(self, s); \
@@ -368,7 +354,7 @@ HPUT(r8, double, NUM2DBL)
 VALUE rb_hps_hputs(VALUE self, VALUE vkey, VALUE vval)
 {
   int rc;
-  struct hashpipe_status *s;
+  hashpipe_status_t *s;
   const char * val = StringValueCStr(vval);
   const char * key = StringValueCStr(vkey);
   Data_Get_HPStruct_Ensure_Attached(self, s);
