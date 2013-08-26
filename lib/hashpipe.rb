@@ -17,8 +17,8 @@ module Hashpipe
     def to_hash
       # Get buffer contents as a String
       s = lock {buf} rescue ''
-      # Split into 80 character lines
-      lines = s.scan(/.{80}/)
+      # Split into RECORD_SIZE character lines
+      lines = s.scan(/.{#{RECORD_SIZE}}/o)
       # Skip END record
       lines.pop if lines[-1].start_with?('END ')
 
