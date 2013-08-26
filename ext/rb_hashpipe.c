@@ -380,6 +380,10 @@ void Init_hashpipe()
   mHashpipe = rb_define_module("Hashpipe");
   cStatus = rb_define_class_under(mHashpipe, "Status", rb_cObject);
 
+  // RECORD_SIZE constant
+  rb_define_const(cStatus, "RECORD_SIZE",
+      INT2FIX(HASHPIPE_STATUS_RECORD_SIZE));
+
   rb_define_alloc_func(cStatus, rb_hps_alloc);
   rb_define_singleton_method(cStatus, "exists?", rb_hps_exists, 1);
   rb_define_method(cStatus, "initialize", rb_hps_init, -1);
