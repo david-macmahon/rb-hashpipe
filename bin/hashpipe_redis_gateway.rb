@@ -77,6 +77,7 @@ OPTS = {
   :create       => false,
   :delay        => 1.0,
   :instance_ids => (0..3),
+  :foreground   => false,
   :gwname       => Socket.gethostname,
   :notify       => false,
   :server       => 'redishost',
@@ -100,6 +101,10 @@ OP = OptionParser.new do |op|
     o = 0.25 if o < 0.25
     o = 60.0 if o > 60.0
     OPTS[:delay] = o
+  end
+  op.on('-f', '--[no-]foreground',
+        "Run in foreground [#{OPTS[:foreground]}]") do |o|
+    OPTS[:foreground] = o
   end
   op.on('-g', '--gwname=GWNAME',
         "Name of this gateway [#{OPTS[:gwname]}]") do |o|
@@ -232,6 +237,9 @@ end # def update_redis
 
 # Create Redis object
 redis = Redis.new(:host => OPTS[:server])
+
+# Become a daemon process unless running in foreground was requested
+Process.daemon unless OPTS[:foreground]
 
 # Loop "forever"
 while
