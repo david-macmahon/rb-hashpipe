@@ -156,7 +156,8 @@ if instance_ids.empty?
   exit 1
 end
 
-puts "Gateway Hashpipe instances #{instance_ids.join(',')}"
+gwinst_list = instance_ids.map {|i| "#{OPTS[:gwname]}/#{i}"}
+puts "Gateway Hashpipe instances: #{gwinst_list.join(' ')}"
 
 # Set OPTS[:instance_ids] to those that we have
 OPTS[:instance_ids] = instance_ids
