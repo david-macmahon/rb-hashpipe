@@ -171,7 +171,7 @@ GWCMD_CHANNEL = "hashpipe://#{OPTS[:gwname]}/gateway"
 BCASTCMD_CHANNEL = 'hashpipe:///gateway'
 
 # Create subscribe thread
-Thread.new do
+subscribe_thread = Thread.new do
   # Create Redis object for subscribing
   subscriber = Redis.new(:host => OPTS[:server])
   subscriber.subscribe(BCASTSET_CHANNEL, BCASTCMD_CHANNEL,
@@ -196,6 +196,9 @@ Thread.new do
         pairs = msg.split("\n").map {|s| s.split('=')}
         pairs.each do |k,v|
           case k
+          when /quit/i
+            puts "got quit command"
+            return
           when 'delay', 'DELAY'
             delay = Float(v) rescue 1.0
             delay = 0.25 if delay < 0.25
@@ -242,8 +245,8 @@ redis = Redis.new(:host => OPTS[:server])
 # Become a daemon process unless running in foreground was requested
 Process.daemon unless OPTS[:foreground]
 
-# Loop "forever"
-while
+# Loop until subscribe_thread stops
+while subscribe_thread.alive?
   update_redis(redis, OPTS[:instance_ids], OPTS[:notify])
   # Delay before doing it again
   sleep OPTS[:delay]
