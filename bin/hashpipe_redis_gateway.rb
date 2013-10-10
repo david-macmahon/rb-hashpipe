@@ -226,7 +226,8 @@ def update_redis(redis, instance_ids, notify=false)
       redis.multi do
         key = "hashpipe://#{OPTS[:gwname]}/#{iid}/status"
         redis.del(key)
-        redis.mapped_hmset(key, sb.to_hash)
+        sb_hash = sb.to_hash
+        redis.mapped_hmset(key, sb_hash)
         # Expire time must be integer, we always round up
         redis.expire(key, (3*OPTS[:delay]).ceil) if OPTS[:expire]
         if notify
