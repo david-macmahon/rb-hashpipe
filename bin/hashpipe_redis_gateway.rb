@@ -136,6 +136,9 @@ end
 OP.parse!
 #p OPTS; exit
 
+# Become a daemon process unless running in foreground was requested
+Process.daemon unless OPTS[:foreground]
+
 # STATUS_BUFS maps instance id (String or Integer) to Hashpipe::Status object.
 STATUS_BUFS = {}
 # Create Hashpipe::Status objects
@@ -242,9 +245,6 @@ end # def update_redis
 
 # Create Redis object
 redis = Redis.new(:host => OPTS[:server])
-
-# Become a daemon process unless running in foreground was requested
-Process.daemon unless OPTS[:foreground]
 
 # Loop until subscribe_thread stops
 while subscribe_thread.alive?
