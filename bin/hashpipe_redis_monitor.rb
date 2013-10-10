@@ -148,10 +148,14 @@ def display_status(redis, key_fragments, fragidx=0)
       #      sleep(1)
       #    end
       #  end
-      when '+', '=', Key::RIGHT, Key::DOWN
+      when '=', Key::RIGHT
         fragidx += 1 if fragidx < key_fragments.length-1
-      when '-', Key::LEFT, Key::UP
+      when '-', Key::LEFT
         fragidx -= 1 if fragidx > 0
+      when '+', Key::DOWN
+        fragidx += 4 if fragidx < key_fragments.length-4
+      when '_', Key::UP
+        fragidx -= 4 if fragidx > 3
       end # case
 
       c = stdscr.getch
