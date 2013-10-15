@@ -15,13 +15,14 @@ require 'redis'
 
 OPTS = {
   :key_glob => '*',
+  :list_keys => false,
   :server   => 'redishost'
 }
 
 OP = OptionParser.new do |op|
   op.program_name = File.basename($0)
 
-  op.banner = "Usage: #{op.program_name} [OPTIONS] STATUS_KEY_REGEXP"
+  op.banner = "Usage: #{op.program_name} [OPTIONS] [STATUS_KEY_REGEXP]"
   op.separator('')
   op.separator('Grep for Hashpipe status buffer keys in a Redis server.')
   op.separator('All hashpipe status buffers cached in the server will be')
@@ -29,11 +30,18 @@ OP = OptionParser.new do |op|
   op.separator('Matches are printed as three fields: hashpipe instance name,')
   op.separator('status buffer key, and corresponding status buffer value.')
   op.separator('Matches against STATUS_KEY_REGEXP are case insensitive.')
+  op.separator('STATUS_KEY_REGEXP defaults to "^", which matches everything.')
+  op.separator('The list option lists keys uniquely (without values).')
   op.separator('')
   op.separator('Options:')
   op.on('-k', '--key-glob=GLOB',
-        "Redis key glob pattern [#{OPTS[:key_glob]}]") do |o|
+        "Redis key glob pattern [#{OPTS[:key_glob]}]",
+        "Key glob used will be 'hashpipe://*GLOB*/status'") do |o|
     OPTS[:key_glob] = o
+  end
+  op.on('-l', '--[no-]list',
+        "List status buffer keys [#{OPTS[:list_keys]}]") do |o|
+    OPTS[:list_keys] = o
   end
   op.on('-s', '--server=NAME',
         "Host running redis-server [#{OPTS[:server]}]") do |o|
@@ -48,13 +56,8 @@ end
 OP.parse!
 #p OPTS; exit
 
-if ARGV.empty?
-  puts OP.help
-  exit 1
-end
-
-# Create case-INsensitive Regexp object for given pattern
-pattern = Regexp.new(ARGV[0], true)
+# Create case-INsensitive Regexp object for given (or default) pattern
+pattern = Regexp.new(ARGV[0]||'^', true)
 
 # Create Redis object
 redis = Redis.new(:host => OPTS[:server])
@@ -63,20 +66,34 @@ redis = Redis.new(:host => OPTS[:server])
 key_glob = "hashpipe://*#{OPTS[:key_glob]}*/status"
 rkeys = redis.keys(key_glob).sort
 
+# Create list for status buffer keys (for -l option)
+sbkeylist = []
+
 # For each redis key
 rkeys.each do |rkey|
   # Get list of status buffer keys that match pattern
   sbkeys = redis.hkeys(rkey).grep(pattern).sort
   # Skip to next if no keys match
   next if sbkeys.empty?
-  # Get values for status buffer keys that match pattern
-  sbvals = redis.hmget(rkey, *sbkeys)
-  # Make cleaned up redis key name
-  clean_key = rkey.sub(%r{^hashpipe://}, '')
-  clean_key.sub!(%r{/status$}, '')
-  # Print each matching sbkey with value
-  sbkeys.each_with_index do |sbkey, i|
-    sbval = sbvals[i]
-    printf "%s %s %s\n", clean_key, sbkey, sbval
+
+  if OPTS[:list_keys]
+    sbkeylist += sbkeys
+  else
+    # Get values for status buffer keys that match pattern
+    sbvals = redis.hmget(rkey, *sbkeys)
+    # Make cleaned up redis key name
+    clean_key = rkey.sub(%r{^hashpipe://}, '')
+    clean_key.sub!(%r{/status$}, '')
+    # Print each matching sbkey with value
+    sbkeys.each_with_index do |sbkey, i|
+      sbval = sbvals[i]
+      printf "%s %s %s\n", clean_key, sbkey, sbval
+    end
   end
+end
+
+if OPTS[:list_keys]
+  sbkeylist.sort!
+  sbkeylist.uniq!
+  puts sbkeylist
 end
