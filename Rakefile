@@ -26,6 +26,7 @@ spec = Gem::Specification.new do |s|
 
   # Files, Libraries, and Extensions
   s.files = %w[
+    bin/hashpipe_irqps.rb
     bin/hashpipe_redis_gateway.rb
     bin/hashpipe_redis_grep.rb
     bin/hashpipe_redis_monitor.rb
@@ -40,6 +41,7 @@ spec = Gem::Specification.new do |s|
   #s.autorequire = nil
   #s.bindir = 'bin'
   s.executables = %w[
+    hashpipe_irqps.rb
     hashpipe_redis_gateway.rb
     hashpipe_redis_grep.rb
     hashpipe_redis_monitor.rb
