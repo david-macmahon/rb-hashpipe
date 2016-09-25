@@ -81,7 +81,7 @@ VALUE rb_hps_exists(VALUE klass, VALUE vid)
 VALUE rb_hps_attach(int argc, VALUE *argv, VALUE self)
 {
   VALUE vid, vcreate;
-  int id, create;
+  int id;
   VALUE vrc;
   hashpipe_status_t tmp, *s;
 
@@ -355,7 +355,6 @@ VALUE rb_hps_delete(VALUE self, VALUE vkey)
 #define HPUT(typecode, type, conv) \
   VALUE rb_hps_hput##typecode(VALUE self, VALUE vkey, VALUE vval) \
   { \
-    int rc; \
     hashpipe_status_t *s; \
     char save = '\0'; \
     char * key = StringValueCStr(vkey); \
@@ -365,9 +364,9 @@ VALUE rb_hps_delete(VALUE self, VALUE vkey)
       save = key[8]; \
       key[8] = '\0'; \
     } \
-    type val = (type)conv(vval); \
+    val = (type)conv(vval); \
     Data_Get_HPStruct_Ensure_Attached(self, s); \
-    rc = hput##typecode(s->buf, key, val); \
+    hput##typecode(s->buf, key, val); \
     if(save) key[8] = save; \
     return self; \
   }
