@@ -70,19 +70,19 @@ def display_status(redis, key_fragments, fragidx=0)
     keys = data.keys.sort
     keys.delete 'INSTANCE'
 
-    prefix = keys.empty? ? '' : keys[0][0,3]
+    #prefix = keys.empty? ? '' : keys[0][0,3]
 
     keys.each do |k|
-      if k[0,3] != prefix
-        prefix = k[0,3]
-        curline += flip
-        col = 2
-        flip = 0
-        #stdscr.addch(curline, 0, ACS_LTEE)
-        #stdscr.hline(curline, 1, ACS_HLINE, xmax-2)
-        #stdscr.addch(curline, xmax-1, ACS_RTEE)
-        curline += 1
-      end
+      #if k[0,3] != prefix
+      #  prefix = k[0,3]
+      #  curline += flip
+      #  col = 2
+      #  flip = 0
+      #  #stdscr.addch(curline, 0, ACS_LTEE)
+      #  #stdscr.hline(curline, 1, ACS_HLINE, xmax-2)
+      #  #stdscr.addch(curline, xmax-1, ACS_RTEE)
+      #  curline += 1
+      #end
 
       v = data[k]
       if (curline < stdscr.maxy-3)
