@@ -286,9 +286,16 @@ VALUE rb_hps_length(VALUE self)
     int rc; \
     type val; \
     hashpipe_status_t *s; \
-    const char * key = StringValueCStr(vkey); \
+    char save = '\0'; \
+    char * key = StringValueCStr(vkey); \
+    if(strlen(key) > 8) { \
+      rb_warning("key '%s' truncated to 8 characters", key); \
+      save = key[8]; \
+      key[8] = '\0'; \
+    } \
     Data_Get_HPStruct_Ensure_Attached(self, s); \
     rc = hget##typecode(s->buf, key, &val); \
+    if(save) key[8] = save; \
     return rc ? conv(val) : Qnil; \
   }
 
@@ -305,17 +312,25 @@ VALUE rb_hps_hgets(VALUE self, VALUE vkey)
   int rc;
   char val[HASHPIPE_STATUS_RECORD_SIZE];
   hashpipe_status_t *s;
-  const char * key = StringValueCStr(vkey);
+  char save = '\0';
+  char * key = StringValueCStr(vkey);
+  if(strlen(key) > 8) {
+    rb_warning("key '%s' truncated to 8 characters", key);
+    save = key[8];
+    key[8] = '\0';
+  }
   Data_Get_HPStruct_Ensure_Attached(self, s);
   rc = hgets(s->buf, key, HASHPIPE_STATUS_RECORD_SIZE, val);
   val[HASHPIPE_STATUS_RECORD_SIZE-1] = '\0';
+  if(save) key[8] = save;
   return rc ? rb_str_new_cstr(val) : Qnil;
 }
 
 VALUE rb_hps_delete(VALUE self, VALUE vkey)
 {
   hashpipe_status_t *s;
-  const char * key;
+  char save = '\0';
+  char * key;
   VALUE val;
 
   // Get current value (to be returned)
@@ -324,8 +339,14 @@ VALUE rb_hps_delete(VALUE self, VALUE vkey)
   if(RTEST(val)) {
     // Delete key
     key = StringValueCStr(vkey);
+    if(strlen(key) > 8) {
+      // Already warned
+      save = key[8];
+      key[8] = '\0';
+    }
     Data_Get_HPStruct_Ensure_Attached(self, s);
     hdel(s->buf, key);
+    if(save) key[8] = save;
   }
 
   return val;
@@ -336,10 +357,18 @@ VALUE rb_hps_delete(VALUE self, VALUE vkey)
   { \
     int rc; \
     hashpipe_status_t *s; \
-    const char * key = StringValueCStr(vkey); \
+    char save = '\0'; \
+    char * key = StringValueCStr(vkey); \
+    type val; \
+    if(strlen(key) > 8) { \
+      rb_warning("key '%s' truncated to 8 characters", key); \
+      save = key[8]; \
+      key[8] = '\0'; \
+    } \
     type val = (type)conv(vval); \
     Data_Get_HPStruct_Ensure_Attached(self, s); \
     rc = hput##typecode(s->buf, key, val); \
+    if(save) key[8] = save; \
     return self; \
   }
 
@@ -355,10 +384,17 @@ VALUE rb_hps_hputs(VALUE self, VALUE vkey, VALUE vval)
 {
   int rc;
   hashpipe_status_t *s;
+  char save = '\0';
   const char * val = StringValueCStr(vval);
-  const char * key = StringValueCStr(vkey);
+  char * key = StringValueCStr(vkey);
+  if(strlen(key) > 8) {
+    rb_warning("key '%s' truncated to 8 characters", key);
+    save = key[8];
+    key[8] = '\0';
+  }
   Data_Get_HPStruct_Ensure_Attached(self, s);
   rc = hputs(s->buf, key, val);
+  if(save) key[8] = save;
   if(rc)
     // Currently, the only error return is if header length is exceeded
     rb_raise(rb_eRuntimeError, "header length exceeded");
