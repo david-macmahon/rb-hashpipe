@@ -191,7 +191,21 @@ subscribe_thread = Thread.new do
         pairs = msg.split("\n").map {|s| s.split('=')}
         insts.each do |i|
           sb = STATUS_BUFS[i]
-          pairs.each {|k,v| sb[k] = v}
+          pairs.each do |k,v|
+            # If v is all digits, convert to Integer
+            # otherwise try to convert to Float
+            if /^\d+$/ =~ v
+              v = v.to_i
+            else
+              v = Float(v) rescue v
+            end
+
+            case v
+            when Integer; sb.hputi8(k, v)
+            when Float;   sb.hputr8(k, v)
+            else sb.hputs(k, v)
+            end
+          end
         end
 
       # Gateway channels
