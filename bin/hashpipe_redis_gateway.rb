@@ -169,16 +169,22 @@ OPTS[:instance_ids] = instance_ids
 SBSET_CHANNELS = OPTS[:instance_ids].map do |i|
   "hashpipe://#{OPTS[:gwname]}/#{i}/set"
 end
+SBREQ_CHANNELS = OPTS[:instance_ids].map do |i|
+  "hashpipe://#{OPTS[:gwname]}/#{i}/req"
+end
 BCASTSET_CHANNEL = 'hashpipe:///set'
+BCASTREQ_CHANNEL = 'hashpipe:///req'
 GWCMD_CHANNEL = "hashpipe://#{OPTS[:gwname]}/gateway"
 BCASTCMD_CHANNEL = 'hashpipe:///gateway'
 
 # Create subscribe thread
 subscribe_thread = Thread.new do
-  # Create Redis object for subscribing
+  # Create Redis objects for publishing/subscribing
+  publisher  = Redis.new(:host => OPTS[:server])
   subscriber = Redis.new(:host => OPTS[:server])
-  subscriber.subscribe(BCASTSET_CHANNEL, BCASTCMD_CHANNEL,
-                       GWCMD_CHANNEL, *SBSET_CHANNELS) do |on|
+  subscriber.subscribe(BCASTSET_CHANNEL, *SBSET_CHANNELS,
+                       BCASTREQ_CHANNEL, *SBREQ_CHANNELS,
+                       BCASTCMD_CHANNEL, GWCMD_CHANNEL) do |on|
     on.message do |chan, msg|
       case chan
       # Set channels
@@ -208,6 +214,24 @@ subscribe_thread = Thread.new do
               end
             end
           end
+        end
+
+      when BCASTREQ_CHANNEL, *SBREQ_CHANNELS
+        insts = case chan
+                when BCASTREQ_CHANNEL; OPTS[:instance_ids]
+                when %r{/(\w+)/req}; [$1]
+                end
+
+        keys = msg.split("\n")
+        insts.each do |inst|
+          sb = STATUS_BUFS[inst]
+          resp = []
+          sb.lock do
+            resp = keys.map do |k|
+              "#{k}=#{sb.hgets(k)}"
+            end
+          end
+          publisher.publish("hashpipe://#{OPTS[:gwname]}/#{inst}/rep", resp.join("\n"))
         end
 
       # Gateway channels
