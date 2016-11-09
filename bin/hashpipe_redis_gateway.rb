@@ -200,10 +200,12 @@ subscribe_thread = Thread.new do
               v = Float(v) rescue v
             end
 
-            case v
-            when Integer; sb.hputi8(k, v)
-            when Float;   sb.hputr8(k, v)
-            else sb.hputs(k, v)
+            sb.lock do
+              case v
+              when Integer; sb.hputi8(k, v)
+              when Float;   sb.hputr8(k, v)
+              else sb.hputs(k, v)
+              end
             end
           end
         end
