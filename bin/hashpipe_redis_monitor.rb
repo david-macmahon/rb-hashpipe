@@ -73,7 +73,7 @@ def display_status(redis, key_fragments, fragidx=0)
     prefix = keys.empty? ? '' : keys[0][0,3]
 
     keys.each do |k|
-      if k[0,3] != prefix
+      if LOOSE && k[0,3] != prefix
         prefix = k[0,3]
         curline += flip
         col = 2
@@ -163,6 +163,13 @@ def display_status(redis, key_fragments, fragidx=0)
   end # while run
 end # display_status
 
+if ARGV[0] == '-l'
+  LOOSE = true
+  shift
+else
+  LOOSE = false
+end
+
 # Need at least two arguments.  First is name of host running Redis server.
 # Remaining are key "fragments" from command line (ARGV).  Format of each key
 # fragment is "#{gwname}/#{instance_id}" (e.g. "px1/0").  One way to create
@@ -172,7 +179,7 @@ end # display_status
 #
 # Gives help if fewer than 2 arguments are given.
 if ARGV.length < 2
-  puts "Usage: #{File.basename($0)} REDISHOST GW/INST [...]"
+  puts "Usage: #{File.basename($0)} [-l] REDISHOST GW/INST [...]"
   puts
   puts "Example: #{File.basename($0)} redishost px{1..8}/{0..1}"
   exit
