@@ -14,6 +14,10 @@
 
 #include "ruby.h"
 
+#include "ruby/thread.h"
+#define rb_thread_blocking_region rb_thread_call_without_gvl
+#define BLOCKING_TYPE void *
+
 #define Data_Get_HPStruct(self, s) \
   Data_Get_Struct(self, hashpipe_status_t, s);
 
@@ -44,7 +48,7 @@ rb_hps_alloc(VALUE klass)
 
 // This is called by rb_thread_blocking_region withOUT GVL.
 // Returns Qtrue on error, Qfalse on OK.
-static VALUE
+static BLOCKING_TYPE
 rb_hps_attach_blocking_func(void * s)
 {
   int rc;
@@ -53,7 +57,7 @@ rb_hps_attach_blocking_func(void * s)
       ((hashpipe_status_t *)s)->instance_id,
       (hashpipe_status_t *)s);
 
-  return rc ? Qtrue : Qfalse;
+  return (BLOCKING_TYPE)(rc ? Qtrue : Qfalse);
 }
 
 /*
@@ -100,7 +104,7 @@ VALUE rb_hps_attach(int argc, VALUE *argv, VALUE self)
   // Ensure that instance_id field is set
   tmp.instance_id = id;
 
-  vrc = rb_thread_blocking_region(
+  vrc = (VALUE)rb_thread_blocking_region(
       rb_hps_attach_blocking_func, &tmp,
       RUBY_UBF_PROCESS, NULL);
 
@@ -199,12 +203,12 @@ VALUE rb_hps_unlock(VALUE self)
 
 // This is called by rb_thread_blocking_region withOUT GVL.
 // Returns Qtrue on error, Qfalse on OK.
-static VALUE
+static BLOCKING_TYPE
 rb_hps_lock_blocking_func(void * s)
 {
   int rc;
   rc = hashpipe_status_lock((hashpipe_status_t *)s);
-  return rc ? Qtrue : Qfalse;
+  return (BLOCKING_TYPE)(rc ? Qtrue : Qfalse);
 }
 
 /*
@@ -220,7 +224,7 @@ VALUE rb_hps_lock(VALUE self)
 
   Data_Get_HPStruct_Ensure_Attached(self, s);
 
-  vrc = rb_thread_blocking_region(
+  vrc = (VALUE)rb_thread_blocking_region(
       rb_hps_lock_blocking_func, s,
       RUBY_UBF_PROCESS, NULL);
 
@@ -237,11 +241,11 @@ VALUE rb_hps_lock(VALUE self)
 
 // This is called by rb_thread_blocking_region withOUT GVL.
 // Returns Qnil always
-static VALUE
+static BLOCKING_TYPE
 rb_hps_clear_blocking_func(void * s)
 {
   hashpipe_status_clear((hashpipe_status_t *)s);
-  return Qnil;
+  return (BLOCKING_TYPE)Qnil;
 }
 
 /*
