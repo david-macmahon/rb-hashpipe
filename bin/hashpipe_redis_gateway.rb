@@ -192,10 +192,23 @@ subscribe_thread = Thread.new do
         insts.each do |i|
           sb = STATUS_BUFS[i]
           pairs.each do |k,v|
+            # If v is all digits, convert to Integer
+            # otherwise try to convert to Float
+            if /^\d+$/ =~ v
+              v = v.to_i
+            else
+              v = Float(v) rescue v
+            end
+
+            case v
+            when Integer; sb.hputi8(k, v)
+            when Float;   sb.hputr8(k, v)
+            else sb.hputs(k, v)
+            end
+
             if OPTS[:foreground]
               puts "#{OPTS[:gwname]}/#{i} #{k}=#{v}"
             end
-            sb[k] = v
           end
         end
 
