@@ -191,7 +191,12 @@ subscribe_thread = Thread.new do
         pairs = msg.split("\n").map {|s| s.split('=')}
         insts.each do |i|
           sb = STATUS_BUFS[i]
-          pairs.each {|k,v| sb[k] = v}
+          pairs.each do |k,v|
+            if OPTS[:foreground]
+              puts "#{OPTS[:gwname]}/#{i} #{k}=#{v}"
+            end
+            sb[k] = v
+          end
         end
 
       # Gateway channels
