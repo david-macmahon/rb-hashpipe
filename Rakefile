@@ -16,7 +16,7 @@ spec = Gem::Specification.new do |s|
     EOD
   #s.platform = Gem::Platform::Ruby
   s.required_ruby_version = '>= 1.8.1'
-  s.add_dependency('redis', '~> 3.0.2')
+  s.add_dependency('redis', '~> 4.0')
 
   # About
   s.authors = 'David MacMahon'
