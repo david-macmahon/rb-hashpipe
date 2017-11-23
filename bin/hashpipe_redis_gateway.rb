@@ -207,7 +207,7 @@ subscribe_thread = Thread.new do
             end
 
             if OPTS[:foreground]
-              puts "#{OPTS[:gwname]}/#{i} #{k}=#{v}"
+              puts "#{OPTS[:gwname]}/#{i} #{k}=#{v} (#{v.class})"
             end
           end
         end
