@@ -70,7 +70,7 @@ def display_status(redis, key_fragments, fragidx=0)
     keys = data.keys.sort
     keys.delete 'INSTANCE'
 
-    #prefix = keys.empty? ? '' : keys[0][0,3]
+    prefix = keys.empty? ? '' : keys[0][0,3]
 
     keys.each do |k|
       if LOOSE && k[0,3] != prefix
@@ -165,7 +165,7 @@ end # display_status
 
 if ARGV[0] == '-l'
   LOOSE = true
-  shift
+  ARGV.shift
 else
   LOOSE = false
 end
