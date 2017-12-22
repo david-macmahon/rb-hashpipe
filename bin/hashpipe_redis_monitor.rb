@@ -52,8 +52,8 @@ def display_status(redis, key_fragments, fragidx=0)
     # Make sure data is not nil
     data ||= {}
 
-    # Clear screen
-    stdscr.clear
+    # Erase screen (no flicker!)
+    stdscr.erase
 
     # Draw border
     stdscr.box(0,0)

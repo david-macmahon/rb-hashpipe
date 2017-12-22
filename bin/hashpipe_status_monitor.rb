@@ -45,8 +45,8 @@ def display_status(stat, instance_id)
     # Get instance_id (as a string) from status buffer
     instance_str = data['INSTANCE'] rescue '?'
 
-    # Clear screen
-    stdscr.clear
+    # Erase screen (no flicker!)
+    stdscr.erase
 
     # Draw border
     stdscr.box(0,0)
