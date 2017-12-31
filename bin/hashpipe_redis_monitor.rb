@@ -228,6 +228,15 @@ def display_status(redis, key_fragments, fragidx=0)
         fragidx += 4 if fragidx < key_fragments.length-4
       when '_', Key::UP
         fragidx -= 4 if fragidx > 3
+      # Space or ctrl-L or ctrl-R uses the harsher #clear
+      when ' ', 'L'.ord-'A'.ord+1, 'R'.ord-'A'.ord+1
+        stdscr.clear
+      ## Key code diagnostics
+      #else
+      #  addstr(stdscr, 4, 2, ' ' * (stdscr.maxx-2))
+      #  addstr(stdscr, 4, 2, "got '#{c.inspect}'")
+      #  stdscr.refresh
+      #  sleep 1
       end # case
 
       c = stdscr.getch
