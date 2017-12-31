@@ -76,7 +76,15 @@ end
 # Old versions of Curses don't have Window#erase
 if !Curses::Window.instance_methods.index(:erase)
   class Curses::Window
-    alias :erase :clear
+    def erase
+      color_set(DEFCOL)
+      blanks = ' ' * maxx
+      maxy.times do |y|
+        setpos(y, 0)
+        addstr(blanks)
+      end
+      setpos(0, 0)
+    end
   end
 end
 
