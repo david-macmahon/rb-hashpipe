@@ -161,7 +161,8 @@ def display_status(redis, key_fragments, fragidx=0)
         addstr(stdscr, curline, col, '%8s : ' % k, KEYCOL)
         addstr(stdscr, nil, nil, v, VALCOL)
       else
-        addstr(stdscr, stdscr.maxy-3, col,
+        addstr(stdscr, stdscr.maxy-3, 2, ' ' * (stdscr.maxx - 3))
+        addstr(stdscr, stdscr.maxy-3, 2,
                '-- Increase window size --', ERRCOL)
       end
 
@@ -181,10 +182,10 @@ def display_status(redis, key_fragments, fragidx=0)
     end
 
     if nil_data
+      addstr(stdscr, curline, col, ' ' * (stdscr.maxx - col - 1))
       addstr(stdscr, curline, col,
              "No data found for #{key_fragments[fragidx]}!",
              ERRCOL)
-      stdscr.clrtoeol
     end
 
     # Bottom info line
