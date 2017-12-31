@@ -17,6 +17,7 @@ VALCOL = 2
 ERRCOL = 3
 
 OPTS = {
+  :domain => 'hashpipe',
   :loose  => false,
   :server => 'redishost'
 }
@@ -26,6 +27,10 @@ OP = OptionParser.new do |op|
 
   op.banner = "Usage: #{op.program_name} [OPTIONS] [REDISHOST] GW/INST [...]"
   op.separator('')
+  op.on('-D', '--domain=DOMAIN',
+        "Domain for Redis channels/keys [#{OPTS[:domain]}]") do |o|
+    OPTS[:domain] = o
+  end
   op.on('-l', '--[no-]loose',
         "Use loose display format [#{OPTS[:loose]}]") do |o|
     OPTS[:loose] = o
@@ -105,7 +110,7 @@ def display_status(redis, key_fragments, fragidx=0)
     keyfrag = key_fragments[fragidx]
 
     # Refresh status data from redis
-    data = redis.hgetall(status_key(keyfrag,nil))
+    data = redis.hgetall(status_key(keyfrag, nil, OPTS[:domain]))
     # Remeber whether we got nil data
     nil_data = data.nil?
     # Make sure data is not nil

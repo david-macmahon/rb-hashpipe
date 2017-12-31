@@ -76,6 +76,7 @@ require 'hashpipe'
 OPTS = {
   :create       => false,
   :delay        => 1.0,
+  :domain       => 'hashpipe',
   :instance_ids => (0..3),
   :foreground   => false,
   :gwname       => Socket.gethostname,
@@ -102,6 +103,10 @@ OP = OptionParser.new do |op|
     o = 60.0 if o > 60.0
     OPTS[:delay] = o
   end
+  op.on('-D', '--domain=DOMAIN',
+        "Domain for Redis channels/keys [#{OPTS[:domain]}]") do |o|
+    OPTS[:domain] = o
+  end
   op.on('-f', '--[no-]foreground',
         "Run in foreground [#{OPTS[:foreground]}]") do |o|
     OPTS[:foreground] = o
@@ -110,7 +115,7 @@ OP = OptionParser.new do |op|
         "Name of this gateway [#{OPTS[:gwname]}]") do |o|
     OPTS[:gwname] = o
   end
-  op.on('-i', '--instances=I[,...]', Array,
+  op.on('-i', '--instances=I[,I[...]]', Array,
         "Instances to gateway [#{OPTS[:instance_ids]}]") do |o|
     OPTS[:instance_ids] = o.map {|s| Integer(s) rescue 0}
     OPTS[:instance_ids].uniq!
@@ -167,11 +172,11 @@ OPTS[:instance_ids] = instance_ids
 
 # Create subscribe channel names
 SBSET_CHANNELS = OPTS[:instance_ids].map do |i|
-  "hashpipe://#{OPTS[:gwname]}/#{i}/set"
+  "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{i}/set"
 end
-BCASTSET_CHANNEL = 'hashpipe:///set'
-GWCMD_CHANNEL = "hashpipe://#{OPTS[:gwname]}/gateway"
-BCASTCMD_CHANNEL = 'hashpipe:///gateway'
+BCASTSET_CHANNEL = "#{OPTS[:domain]}:///set"
+GWCMD_CHANNEL = "#{OPTS[:domain]}://#{OPTS[:gwname]}/gateway"
+BCASTCMD_CHANNEL = "#{OPTS[:domain]}:///gateway"
 
 # Create subscribe thread
 subscribe_thread = Thread.new do
@@ -245,7 +250,7 @@ def update_redis(redis, instance_ids, notify=false)
       sb = STATUS_BUFS[iid]
       # Each status buffer update happens in a transaction
       redis.multi do
-        key = "hashpipe://#{OPTS[:gwname]}/#{iid}/status"
+        key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
         redis.del(key)
         sb_hash = sb.to_hash
         redis.mapped_hmset(key, sb_hash)
@@ -253,7 +258,7 @@ def update_redis(redis, instance_ids, notify=false)
         redis.expire(key, (3*OPTS[:delay]).ceil) if OPTS[:expire]
         if notify
           # Publish "updated" method to notify subscribers
-          channel = "hashpipe://#{OPTS[:gwname]}/#{iid}/update"
+          channel = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/update"
           redis.publish channel, key
         end
       end # redis.multi

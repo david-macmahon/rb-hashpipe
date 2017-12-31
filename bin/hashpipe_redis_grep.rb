@@ -14,9 +14,10 @@ require 'optparse'
 require 'redis'
 
 OPTS = {
-  :key_glob => '*',
+  :domain    => 'hashpipe',
+  :key_glob  => '*',
   :list_keys => false,
-  :server   => 'redishost'
+  :server    => 'redishost'
 }
 
 OP = OptionParser.new do |op|
@@ -34,6 +35,10 @@ OP = OptionParser.new do |op|
   op.separator('The list option lists keys uniquely (without values).')
   op.separator('')
   op.separator('Options:')
+  op.on('-D', '--domain=DOMAIN',
+        "Domain for Redis channels/keys [#{OPTS[:domain]}]") do |o|
+    OPTS[:domain] = o
+  end
   op.on('-k', '--key-glob=GLOB',
         "Redis key glob pattern [#{OPTS[:key_glob]}]",
         "Key glob used will be 'hashpipe://*GLOB*/status'") do |o|
@@ -63,7 +68,7 @@ pattern = Regexp.new(ARGV[0]||'^', true)
 redis = Redis.new(:host => OPTS[:server])
 
 # Get redis keys for hashpipe status buffers
-key_glob = "hashpipe://*#{OPTS[:key_glob]}*/status"
+key_glob = "#{OPTS[:domain]}://*#{OPTS[:key_glob]}*/status"
 rkeys = redis.keys(key_glob).sort
 
 # Create list for status buffer keys (for -l option)
@@ -82,7 +87,7 @@ rkeys.each do |rkey|
     # Get values for status buffer keys that match pattern
     sbvals = redis.hmget(rkey, *sbkeys)
     # Make cleaned up redis key name
-    clean_key = rkey.sub(%r{^hashpipe://}, '')
+    clean_key = rkey.sub(%r{^#{OPTS[:domain]}://}, '')
     clean_key.sub!(%r{/status$}, '')
     # Print each matching sbkey with value
     sbkeys.each_with_index do |sbkey, i|
