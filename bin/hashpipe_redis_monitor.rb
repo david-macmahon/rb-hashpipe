@@ -3,7 +3,7 @@
 # A curses-based Hashpipe Redis monitor.
 # Transcribed from hashpipe_status_monitor.py.
 
-require 'rubygems'
+require 'optparse'
 require 'curses'
 require 'redis'
 require 'hashpipe/keys'
@@ -15,6 +15,58 @@ DEFCOL = 0
 KEYCOL = 1
 VALCOL = 2
 ERRCOL = 3
+
+OPTS = {
+  :loose  => false,
+  :server => 'redishost'
+}
+
+OP = OptionParser.new do |op|
+  op.program_name = File.basename($0)
+
+  op.banner = "Usage: #{op.program_name} [OPTIONS] [REDISHOST] GW/INST [...]"
+  op.separator('')
+  op.on('-l', '--[no-]loose',
+        "Use loose display format [#{OPTS[:loose]}]") do |o|
+    OPTS[:loose] = o
+  end
+  op.on('-s', '--server=NAME',
+        "Host running redis-server [#{OPTS[:server]}]") do |o|
+    OPTS[:server] = o
+  end
+  #op.separator('')
+  op.on_tail('-h','--help','Show this message') do
+    puts op.help
+    exit
+  end
+end
+OP.parse!
+#p OPTS; exit
+
+# Connect to Redis server, first try ARGV[0], then use OPTS[:server]
+begin
+  # Try ARGV[0] (for backwards compatibility)
+  redis = Redis.new(:host => ARGV[0])
+  redis.ping # Test connection
+  # Connect succeeded, drop ARGV[0]
+  ARGV.shift
+rescue
+  begin
+    # Use OPTS[:server]
+    redis = Redis.new(:host => OPTS[:server])
+    redis.ping # Test connection
+  rescue
+    print "Error connecting to redis server '#{OPTS[:server]}'"
+    print " and '#{ARGV[0]}'" if ARGV[0] != OPTS[:server]
+    puts
+    exit 1
+  end
+end
+
+if ARGV.empty?
+  puts OP
+  exit 1
+end
 
 def addstr(win, row, col, string, color=DEFCOL)
   win.setpos(row, col) if row && col
@@ -40,7 +92,7 @@ def display_status(redis, key_fragments, fragidx=0)
   init_pair(VALCOL, COLOR_GREEN, COLOR_BLACK)
   init_pair(ERRCOL, COLOR_WHITE, COLOR_RED)
 
-  # Loop 
+  # Loop
   while run
     # Get current key fragment
     keyfrag = key_fragments[fragidx]
@@ -73,7 +125,7 @@ def display_status(redis, key_fragments, fragidx=0)
     prefix = keys.empty? ? '' : keys[0][0,3]
 
     keys.each do |k|
-      if LOOSE && k[0,3] != prefix
+      if OPTS[:loose] && k[0,3] != prefix
         prefix = k[0,3]
         curline += flip
         col = 2
@@ -124,7 +176,7 @@ def display_status(redis, key_fragments, fragidx=0)
     stdscr.refresh
 
     # Sleep a bit
-    sleep 0.25 
+    sleep 0.25
 
     # Look for input
     while c = stdscr.getch
@@ -162,39 +214,6 @@ def display_status(redis, key_fragments, fragidx=0)
     end # while c != ERR
   end # while run
 end # display_status
-
-if ARGV[0] == '-l'
-  LOOSE = true
-  ARGV.shift
-else
-  LOOSE = false
-end
-
-# Need at least two arguments.  First is name of host running Redis server.
-# Remaining are key "fragments" from command line (ARGV).  Format of each key
-# fragment is "#{gwname}/#{instance_id}" (e.g. "px1/0").  One way to create
-# these on a bash command line is:
-#
-#   px{1..8}/{0..1}
-#
-# Gives help if fewer than 2 arguments are given.
-if ARGV.length < 2
-  puts "Usage: #{File.basename($0)} [-l] REDISHOST GW/INST [...]"
-  puts
-  puts "Example: #{File.basename($0)} redishost px{1..8}/{0..1}"
-  exit
-end
-
-# First command line arg is redis host
-redishost = ARGV.shift
-
-# Connect to Redis server
-begin
-    redis = Redis.new(:host => redishost)
-rescue
-    puts "Error connecting to redis server '#{instance_id}'"
-    exit 1 
-end
 
 # Initialize screen and call the main func
 init_screen
