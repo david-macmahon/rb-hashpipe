@@ -68,6 +68,13 @@ if ARGV.empty?
   exit 1
 end
 
+# Old versions of Curses don't have Window#erase
+if !Curses::Window.instance_methods.index(:erase)
+  class Curses::Window
+    alias :erase :clear
+  end
+end
+
 def addstr(win, row, col, string, color=DEFCOL)
   win.setpos(row, col) if row && col
   win.color_set(color) if color
