@@ -112,7 +112,7 @@ def display_status(redis, key_fragments, fragidx=0)
     # Refresh status data from redis
     data = redis.hgetall(status_key(keyfrag, nil, OPTS[:domain]))
     # Remeber whether we got nil data
-    nil_data = data.nil?
+    nil_data = data.nil? || data.empty?
     # Make sure data is not nil
     data ||= {}
 
@@ -173,7 +173,7 @@ def display_status(redis, key_fragments, fragidx=0)
     end
 
     if nil_data
-      addstr(stdscr, 1, 2, #curline, col,
+      addstr(stdscr, curline, col,
              "No data found for #{key_fragments[fragidx]}!",
              ERRCOL)
       stdscr.clrtoeol
