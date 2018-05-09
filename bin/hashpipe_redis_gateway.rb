@@ -174,16 +174,22 @@ OPTS[:instance_ids] = instance_ids
 SBSET_CHANNELS = OPTS[:instance_ids].map do |i|
   "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{i}/set"
 end
-BCASTSET_CHANNEL = "#{OPTS[:domain]}:///set"
+SBREQ_CHANNELS = OPTS[:instance_ids].map do |i|
+  "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{i}/req"
+end
+BCASTSET_CHANNEL = '#{OPTS[:domain]}:///set'
+BCASTREQ_CHANNEL = '#{OPTS[:domain]}:///req'
 GWCMD_CHANNEL = "#{OPTS[:domain]}://#{OPTS[:gwname]}/gateway"
-BCASTCMD_CHANNEL = "#{OPTS[:domain]}:///gateway"
+BCASTCMD_CHANNEL = '#{OPTS[:domain]}:///gateway'
 
 # Create subscribe thread
 subscribe_thread = Thread.new do
-  # Create Redis object for subscribing
+  # Create Redis objects for publishing/subscribing
+  publisher  = Redis.new(:host => OPTS[:server])
   subscriber = Redis.new(:host => OPTS[:server])
-  subscriber.subscribe(BCASTSET_CHANNEL, BCASTCMD_CHANNEL,
-                       GWCMD_CHANNEL, *SBSET_CHANNELS) do |on|
+  subscriber.subscribe(BCASTSET_CHANNEL, *SBSET_CHANNELS,
+                       BCASTREQ_CHANNEL, *SBREQ_CHANNELS,
+                       BCASTCMD_CHANNEL, GWCMD_CHANNEL) do |on|
     on.message do |chan, msg|
       case chan
       # Set channels
@@ -205,16 +211,36 @@ subscribe_thread = Thread.new do
               v = Float(v) rescue v
             end
 
-            case v
-            when Integer; sb.hputi8(k, v)
-            when Float;   sb.hputr8(k, v)
-            else sb.hputs(k, v)
+            sb.lock do
+              case v
+              when Integer; sb.hputi8(k, v)
+              when Float;   sb.hputr8(k, v)
+              else sb.hputs(k, v)
+              end
+            end
+          end
+        end
+
+      when BCASTREQ_CHANNEL, *SBREQ_CHANNELS
+        insts = case chan
+                when BCASTREQ_CHANNEL; OPTS[:instance_ids]
+                when %r{/(\w+)/req}; [$1]
+                end
+
+        keys = msg.split("\n")
+        insts.each do |inst|
+          sb = STATUS_BUFS[inst]
+          resp = []
+          sb.lock do
+            resp = keys.map do |k|
+              "#{k}=#{sb.hgets(k)}"
             end
 
             if OPTS[:foreground]
               puts "#{OPTS[:gwname]}/#{i} #{k}=#{v} (#{v.class})"
             end
           end
+          publisher.publish("#{OPTS[:domain]}://#{OPTS[:gwname]}/#{inst}/rep", resp.join("\n"))
         end
 
       # Gateway channels
