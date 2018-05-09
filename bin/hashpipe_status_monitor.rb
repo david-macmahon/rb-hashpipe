@@ -82,7 +82,7 @@ def display_status(stat, instance_id)
     prefix = keys.empty? ? '' : keys[0][0,3]
 
     keys.each do |k|
-      if k[0,3] != prefix
+      if LOOSE && k[0,3] != prefix
         prefix = k[0,3]
         curline += flip
         col = 2
@@ -170,6 +170,13 @@ def display_status(stat, instance_id)
     end # while c != ERR
   end # while run
 end # display_status
+
+if ARGV[0] == '-l'
+  LOOSE = true
+  ARGV.shift
+else
+  LOOSE = false
+end
 
 # Get instance_id
 instance_id = Integer(ARGV[0]) rescue 0
