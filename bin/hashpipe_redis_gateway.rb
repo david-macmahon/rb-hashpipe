@@ -177,10 +177,10 @@ end
 SBREQ_CHANNELS = OPTS[:instance_ids].map do |i|
   "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{i}/req"
 end
-BCASTSET_CHANNEL = '#{OPTS[:domain]}:///set'
-BCASTREQ_CHANNEL = '#{OPTS[:domain]}:///req'
+BCASTSET_CHANNEL = "#{OPTS[:domain]}:///set"
+BCASTREQ_CHANNEL = "#{OPTS[:domain]}:///req"
 GWCMD_CHANNEL = "#{OPTS[:domain]}://#{OPTS[:gwname]}/gateway"
-BCASTCMD_CHANNEL = '#{OPTS[:domain]}:///gateway'
+BCASTCMD_CHANNEL = "#{OPTS[:domain]}:///gateway"
 
 # Create subscribe thread
 subscribe_thread = Thread.new do
