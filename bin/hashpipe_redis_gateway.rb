@@ -66,12 +66,49 @@
 #   delay=SECONDS - Sets the delay between updates to SECONDS seconds.  Note
 #                   that SECONDS is interpreted as a floating point number
 #                   (e.g. "0.25").
+#
+# # PROMETHEUS EXPORTER
+#
+# The gateway can also start a Prometheus exporter to expose user-specified
+# status buffer fields as Prometheus metrics.  A YAML file is used to specify
+# the metric name (default: 'hashpipe_status_buffer'), the port on which to
+# listen (default: 9661), and and array of field specifiers details which
+# fields to export and how to export them.  A field specifier consists of the
+# name of the field and an optional boolean flag indicating whether the field
+# is a string.  The field will be assumed to be numeric if the "string" flag is
+# not provided (or if it's false).  All metrics have an "hpinstance" label
+# whose value is the Hashpipe host/instance and "name" label whose value is the
+# field's name.  The metric value for numeric fields be the status buffer
+# values converted to floating point.  String fields will have their value
+# stored as the value of the "value" label and will have a value of 1.
+#
+# Here is the required structure of the YAML file:
+#
+#     port: 9661
+#     name: hashpipe_status_buffer
+#     help: Hashpipe status buffer field
+#     fields:
+#       - name: RA
+#       - name: DEC
+#       - name: SRC_NAME
+#         string: true
+#
+# This will result in the following metrics (assuming gateway domain "bluse",
+# and Hashpipe instance "blpn48/0"):
+#
+#     # HELP hashpipe_status_buffer Status buffer fields for hpguppi_daq
+#     # TYPE hashpipe_status_buffer gauge
+#     hashpipe_status_buffer{domain="bluse", hpinstance="blpn48/0", name="RA"} 156.3626
+#     hashpipe_status_buffer{domain="bluse", hpinstance="blpn48/0", name="DEC"} 46.6493
+#     hashpipe_status_buffer{domain="bluse", hpinstance="blpn48/0", name="SRC_NAME", value="3C295"} 1
 
 require 'rubygems'
 require 'optparse'
 require 'socket'
 require 'redis'
 require 'hashpipe'
+
+DEFAULT_EXPORTER_PORT = 9661
 
 OPTS = {
   :create       => false,
@@ -83,6 +120,7 @@ OPTS = {
   :notify       => false,
   :server       => 'redishost',
   :expire       => true,
+  :prometheus   => nil
 }
 
 OP = OptionParser.new do |op|
@@ -123,6 +161,11 @@ OP = OptionParser.new do |op|
   op.on('-n', '--[no-]notify',
         "Publish update notifications [#{OPTS[:notify]}]") do |o|
     OPTS[:notify] = o
+  end
+  op.on('-p', '--prometheus=CONFFILE',
+        "Export metrics as specified in CONFFILE [no export]") do |o|
+    require 'yaml'
+    OPTS[:prometheus] = YAML.load_file(o)
   end
   op.on('-s', '--server=NAME',
         "Host running redis-server [#{OPTS[:server]}]") do |o|
@@ -266,6 +309,100 @@ subscribe_thread = Thread.new do
   end # subcribe
 end # subscribe thread
 
+def export_metrics(req, res)
+  start = Time.now
+  body = StringIO.new
+
+  metric = OPTS[:prometheus]['name']
+
+  if OPTS[:prometheus]['fields']
+    help   = OPTS[:prometheus]['help']
+    body.puts "# HELP #{metric} #{help}"
+    body.puts "# TYPE #{metric} gauge"
+
+    OPTS[:instance_ids].each do |iid|
+      sb = STATUS_BUFS[iid].to_hash
+      OPTS[:prometheus]['fields'].each do |field|
+        name = field['name']
+        value = sb[name]
+        next unless value
+
+        body.print "#{metric}{domain=\"#{OPTS[:domain]}\", " +
+                   "hpinstance=\"#{OPTS[:gwname]}/#{iid}\", " +
+                   "name=\"#{name}\""
+
+        if field['string']
+          body.print ", value=\"#{value}\""
+          value = 1
+        else
+          value = value.to_r.to_f
+        end
+
+        body.puts "} #{value}"
+      end
+    end
+  end
+
+  body.puts "# HELP #{metric}_scrape_duration_seconds " +
+            "Number of seconds to scrape the #{metric} exporter"
+  body.puts "# TYPE #{metric}_scrape_duration_seconds gauge"
+  body.puts "#{metric}_scrape_duration_seconds{domain=\"#{OPTS[:domain]}\", " +
+            "gateway=\"#{OPTS[:gwname]}\"} #{(Time.now-start).to_f}"
+
+  if req.accept_encoding.index('gzip')
+    res['Content-Encoding'] = 'gzip'
+    res.body = Zlib.gzip(body.string)
+  else
+    res.body = body.string
+  end
+  res.status = 200
+end
+
+exporter_thread = nil
+
+if OPTS[:prometheus]
+  # Require additional packages
+  require 'stringio'
+  require 'webrick'
+  require 'zlib'
+  # Set defaults as needed
+  OPTS[:prometheus]['bind'] ||= '0.0.0.0'
+  OPTS[:prometheus]['port'] ||= DEFAULT_EXPORTER_PORT
+  OPTS[:prometheus]['name'] ||= 'hashpipe_status_buffer'
+  OPTS[:prometheus]['help'] ||= 'Hashpipe status buffer field'
+
+  # Create webrick server (with no logging)
+  OPTS[:exporter] = WEBrick::HTTPServer.new(
+    BindAddress: OPTS[:prometheus]['bind'],
+    Port: OPTS[:prometheus]['port'],
+    AccessLog: [],
+    Logger: WEBrick::Log.new(File::NULL)
+  )
+
+  OPTS[:exporter].mount_proc '/' do |req, res|
+    res.body = '<html><head><title>' +
+               "Hashpipe #{OPTS[:domain]}://#{OPTS[:gwname]} Exporter" +
+               '</title></head><body><h1>' +
+               "Hashpipe #{OPTS[:domain]}://#{OPTS[:gwname]} Exporter" +
+               '</h1><p><a href="/metrics">Metrics</a></p></body></html>'
+    res.status = 200
+  end
+
+  OPTS[:exporter].mount_proc '/metrics' do |req, res|
+    export_metrics(req, res)
+  end
+
+  exporter_thread = Thread.new {OPTS[:exporter].start}
+end
+
+['INT', 'TERM'].each do |sig|
+  trap sig do
+    OPTS[:exporter].shutdown if OPTS[:exporter]
+    exporter_thread.join if exporter_thread
+    subscribe_thread.kill
+  end
+end
+
 # Updates redis with contents of status_bufs and publishes each statusbuf's key
 # on its "update" channel (if +notify+ is true).
 #
@@ -301,3 +438,7 @@ while subscribe_thread.alive?
   # Delay before doing it again
   sleep OPTS[:delay]
 end
+
+# Ensure the web server gets shutdown
+OPTS[:exporter].shutdown if OPTS[:exporter]
+exporter_thread.join if exporter_thread
