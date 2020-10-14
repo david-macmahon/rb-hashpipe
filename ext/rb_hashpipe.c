@@ -303,7 +303,6 @@ VALUE rb_hps_length(VALUE self)
     return rc ? conv(val) : Qnil; \
   }
 
-HGET(i2, short, INT2FIX)
 HGET(i4, int, INT2NUM)
 HGET(i8, long long, LL2NUM)
 HGET(u4, unsigned int, UINT2NUM)
@@ -375,7 +374,6 @@ VALUE rb_hps_delete(VALUE self, VALUE vkey)
     return self; \
   }
 
-HPUT(i2, short, NUM2INT)
 HPUT(i4, int, NUM2INT)
 HPUT(i8, long long, NUM2LL)
 HPUT(u4, unsigned int, NUM2UINT)
@@ -438,7 +436,6 @@ void Init_hashpipe()
   rb_define_method(cStatus, "length", rb_hps_length, 0);
 
   // hget methods
-  HGET_METHOD(cStatus, i2);
   HGET_METHOD(cStatus, i4);
   HGET_METHOD(cStatus, i8);
   HGET_METHOD(cStatus, u4);
@@ -448,7 +445,6 @@ void Init_hashpipe()
   HGET_METHOD(cStatus, s);
 
   // hput methods
-  HPUT_METHOD(cStatus, i2);
   HPUT_METHOD(cStatus, i4);
   HPUT_METHOD(cStatus, i8);
   HPUT_METHOD(cStatus, u4);
