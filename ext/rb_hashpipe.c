@@ -304,9 +304,20 @@ VALUE rb_hps_length(VALUE self)
   }
 
 HGET(i4, int, INT2NUM)
-HGET(i8, long long, LL2NUM)
 HGET(u4, unsigned int, UINT2NUM)
-HGET(u8, unsigned long long, ULL2NUM)
+// Match conversion function to int8 type from fitshead.h
+#if __SIZEOF_INT__ == 8
+HGET(i8, int8, INT2NUM)
+HGET(u8, int8, UINT2NUM)
+#elif __SIZEOF_LONG__ == 8
+HGET(i8, int8, LONG2NUM)
+HGET(u8, int8, ULONG2NUM)
+#elif __SIZEOF_LONG_LONG__ == 8
+HGET(i8, int8, LL2NUM)
+HGET(u8, int8, ULL2NUM)
+#else
+#error cannot determine 8 byte integer type
+#endif
 HGET(r4, float, DBL2NUM)
 HGET(r8, double, DBL2NUM)
 
@@ -375,9 +386,20 @@ VALUE rb_hps_delete(VALUE self, VALUE vkey)
   }
 
 HPUT(i4, int, NUM2INT)
-HPUT(i8, long long, NUM2LL)
 HPUT(u4, unsigned int, NUM2UINT)
-HPUT(u8, unsigned long long, NUM2ULL)
+// Match conversion function to int8 type from fitshead.h
+#if __SIZEOF_INT__ == 8
+HPUT(i8, int8, NUM2INT)
+HPUT(u8, uint8, NUM2UINT)
+#elif __SIZEOF_LONG__ == 8
+HPUT(i8, int8, NUM2LONG)
+HPUT(u8, uint8, NUM2ULONG)
+#elif __SIZEOF_LONG_LONG__ == 8
+HPUT(i8, int8, NUM2LL)
+HPUT(u8, uint8, NUM2ULL)
+#else
+#error cannot determine 8 byte integer type
+#endif
 HPUT(r4, float, NUM2DBL)
 HPUT(r8, double, NUM2DBL)
 
