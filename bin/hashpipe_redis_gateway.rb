@@ -285,6 +285,16 @@ subscribe_thread = Thread.new do
         insts.each do |i|
           sb = STATUS_BUFS[i]
           pairs.each do |k,v|
+            if k.nil? or k.empty?
+              STDERR.puts "invalid key #{k.inspect} (value #{v.inspect})"
+              next
+            end
+
+            if v.nil? or v.empty?
+              STDERR.puts "invalid value #{v.inspect} (key #{k.inspect})"
+              next
+            end
+
             # If v is all digits, convert to Integer
             # otherwise try to convert to Float
             if /^\d+$/ =~ v
