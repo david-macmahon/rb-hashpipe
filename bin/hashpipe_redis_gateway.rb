@@ -276,11 +276,11 @@ subscribe_thread = Thread.new do
           resp = []
           sb.lock do
             resp = keys.map do |k|
-              "#{k}=#{sb.hgets(k)}"
-
+              v = sb.hgets(k)
               if OPTS[:foreground]
-                puts "#{OPTS[:gwname]}/#{i} #{k}=#{v} (#{v.class})"
+                puts "#{OPTS[:gwname]}/#{inst} #{k}=#{v} (#{v.class})"
               end
+              "#{k}=#{v}"
             end
           end
           publisher.publish("#{OPTS[:domain]}://#{OPTS[:gwname]}/#{inst}/rep", resp.join("\n"))
