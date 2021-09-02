@@ -99,7 +99,7 @@
 # The gateway can also start a Prometheus exporter to expose user-specified
 # status buffer fields as Prometheus metrics.  A YAML file is used to specify
 # the metric name (default: 'hashpipe_status_buffer'), the port on which to
-# listen (default: 9661), and and array of field specifiers details which
+# listen (default: 9661), and an array of field specifiers detailing which
 # fields to export and how to export them.  A field specifier consists of the
 # name of the field and an optional boolean flag indicating whether the field
 # is a string.  The field will be assumed to be numeric if the "string" flag is
