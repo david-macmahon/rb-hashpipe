@@ -46,7 +46,15 @@
 # Messages sent to "set" channels are expected to be in "key=value" format with
 # multiple key/value pairs separated by newlines ("\n").
 #
-# The gateway command channel is used to send commands to the gateway itself.
+# The command channels can be used to send commands to the gateway itself.
+# Command channels exist at the instance, gateway, and broadcast levels.
+#
+# The format of the instance specific command channel is:
+#
+#   "hashpipe://#{gwname}/#{instance_id}/gateway"
+#
+#   Example: hashpipe://px1/0/gateway
+#
 # The format of the gateway command channel is:
 #
 #   "hashpipe://#{gwname}/gateway"
@@ -60,12 +68,31 @@
 #
 # Messages sent to gateway command channels are expected to be in
 # "command=args" format with multiple command/args pairs separated by newlines
-# ("\n").  The format of args is command specific.  Currently, only one command
-# is supported:
+# ("\n").  The format of args is command specific.  Currently, four commands
+# are supported:
 #
 #   delay=SECONDS - Sets the delay between updates to SECONDS seconds.  Note
 #                   that SECONDS is interpreted as a floating point number
 #                   (e.g. "0.25").
+#
+#   join=GROUP - Joins the group "GROUP" for the gateway instances associated
+#                with the command channel.  Unicast (i.e. instance specific)
+#                command channels will join the group for that instance only.
+#                Gateway or broadcast command channels will join the group for
+#                all instances of this gateway.  If no instances of this
+#                gateway had previously joined the group, then the gateway will
+#                subscribe to the group "set" channel "hashpipe:GROUP///set".
+#
+#   leave=GROUP - Leaves the group "GROUP" for the gateway instances associated
+#                 with the command channel.  Unicast (i.e. instance specific)
+#                 command channels will leave the group for that instance only.
+#                 Gateway or broadcast command channels will leave the group
+#                 for all instances of this gateway.  If no instances of this
+#                 gateway remain joined the group, then the gateway will
+#                 unsubscribe from the group "set" channel
+#                 "hashpipe:GROUP///set".
+#
+#   quit - Causes the gateway process to exit.
 #
 # # PROMETHEUS EXPORTER
 #
@@ -105,6 +132,7 @@
 require 'rubygems'
 require 'optparse'
 require 'socket'
+require 'set'
 require 'redis'
 require 'hashpipe'
 
@@ -222,8 +250,18 @@ SBREQ_CHANNELS = OPTS[:instance_ids].map do |i|
 end
 BCASTSET_CHANNEL = "#{OPTS[:domain]}:///set"
 BCASTREQ_CHANNEL = "#{OPTS[:domain]}:///req"
+
+SBCMD_CHANNELS = OPTS[:instance_ids].map do |i|
+  "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{i}/gateway"
+end
 GWCMD_CHANNEL = "#{OPTS[:domain]}://#{OPTS[:gwname]}/gateway"
 BCASTCMD_CHANNEL = "#{OPTS[:domain]}:///gateway"
+
+# Hash mappping the "set" channels we have joined to the Set of instance IDs
+# associated with that group "set" channel.  It is possible for different
+# instances handled by a gateway to join different groups.  So we track that
+# part of that instance specific aspect of group membership here.
+grset_chan_to_insts = {}
 
 # Create subscribe thread
 subscribe_thread = Thread.new do
@@ -232,14 +270,15 @@ subscribe_thread = Thread.new do
   subscriber = Redis.new(:host => OPTS[:server])
   subscriber.subscribe(BCASTSET_CHANNEL, *SBSET_CHANNELS,
                        BCASTREQ_CHANNEL, *SBREQ_CHANNELS,
-                       BCASTCMD_CHANNEL, GWCMD_CHANNEL) do |on|
+                       BCASTCMD_CHANNEL, GWCMD_CHANNEL, *SBCMD_CHANNELS) do |on|
     on.message do |chan, msg|
       case chan
       # Set channels
-      when BCASTSET_CHANNEL, *SBSET_CHANNELS
+      when BCASTSET_CHANNEL, *SBSET_CHANNELS, *grset_chan_to_insts.keys
         insts = case chan
-                when BCASTSET_CHANNEL; OPTS[:instance_ids]
-                when %r{/(\w+)/set}; [$1]
+                when BCASTSET_CHANNEL; OPTS[:instance_ids] # "broadcast"
+                when %r{://[^/]+/([^/]+)/set}; [$1]        # "unicast"
+                else grset_chan_to_insts[chan]||[]         # "multicast/group"
                 end
 
         pairs = msg.split("\n").map {|s| s.split('=')}
@@ -287,7 +326,7 @@ subscribe_thread = Thread.new do
         end
 
       # Gateway channels
-      when BCASTCMD_CHANNEL, GWCMD_CHANNEL
+      when BCASTCMD_CHANNEL, GWCMD_CHANNEL, *SBCMD_CHANNELS
         pairs = msg.split("\n").map {|s| s.split('=')}
         pairs.each do |k,v|
           case k
@@ -301,6 +340,46 @@ subscribe_thread = Thread.new do
             OPTS[:delay] = delay
             # Wake up main thread
             Thread.main.wakeup
+
+          when 'join', 'JOIN'
+            insts = case chan
+                    when %r{//[^/]+/([^/]+)/gateway}; [$1] # "unicast"
+                    else OPTS[:instance_ids] # "broadcast" or "gateway"
+                    end
+            group = v
+            grset_channel = "#{OPTS[:domain]}:#{group}///set"
+            puts "joining group #{group} for instances #{insts.inspect}"
+            # If we have no mapping for this group
+            if !grset_chan_to_insts[grset_channel]
+              # Create empty mapping
+              grset_chan_to_insts[grset_channel] = Set.new()
+              # Subscribe to group set channel
+              puts "subscribing to channel #{grset_channel}"
+              subscriber.subscribe(grset_channel)
+            end
+            # Add instances to mapping
+            grset_chan_to_insts[grset_channel] += insts
+
+          when 'leave', 'LEAVE'
+            insts = case chan
+                    when %r{//[^/]+/([^/]+)/gateway}; [$1] # "unicast"
+                    else OPTS[:instance_ids] # "broadcast" or "gateway"
+                    end
+            group = v
+            grset_channel = "#{OPTS[:domain]}:#{group}///set"
+            puts "leaving group #{group} for instances #{insts.inspect}"
+            # If we have a mapping for this group
+            if grset_chan_to_insts[grset_channel]
+              grset_chan_to_insts[grset_channel] -= insts
+              # If no more instances are associated with this group
+              if grset_chan_to_insts[grset_channel].empty?
+                # Remove empty mapping
+                grset_chan_to_insts.delete(grset_channel)
+                # Unsubscribe from group set channel
+                puts "unsubscribing from #{grset_channel}"
+                subscriber.unsubscribe(grset_channel)
+              end
+            end
           end
         end
 
