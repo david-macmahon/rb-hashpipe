@@ -497,23 +497,23 @@ end
 #
 def update_redis(redis, instance_ids, notify=false)
   # Pipeline all status buffer updates
-  redis.pipelined do
+  redis.pipelined do |pipeline|
     instance_ids.each do |iid|
       sb = STATUS_BUFS[iid]
       # Each status buffer update happens in a transaction
-      redis.multi do
+      pipeline.multi do |transaction|
         key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
-        redis.del(key)
+        transaction.del(key)
         sb_hash = sb.to_hash
-        redis.mapped_hmset(key, sb_hash)
+        transaction.mapped_hmset(key, sb_hash)
         # Expire time must be integer, we always round up
-        redis.expire(key, (3*OPTS[:delay]).ceil) if OPTS[:expire]
+        transaction.expire(key, (3*OPTS[:delay]).ceil) if OPTS[:expire]
         if notify
           # Publish "updated" method to notify subscribers
           channel = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/update"
-          redis.publish channel, key
+          transaction.publish channel, key
         end
-      end # redis.multi
+      end # pipeline.multi
     end # status_bufs,each
   end # redis.pipelined
 end # def update_redis
