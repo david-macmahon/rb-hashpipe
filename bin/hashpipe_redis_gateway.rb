@@ -212,6 +212,9 @@ end
 OP.parse!
 #p OPTS; exit
 
+# Use un-buffered stdout
+STDOUT.sync = true
+
 # Become a daemon process unless running in foreground was requested
 Process.daemon unless OPTS[:foreground]
 
