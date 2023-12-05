@@ -503,11 +503,14 @@ def update_redis(redis, instance_ids, notify=false)
   redis.pipelined do |pipeline|
     instance_ids.each do |iid|
       sb = STATUS_BUFS[iid]
+      sb_hash = sb.to_hash
+      if sb_hash.empty?
+        next
+      end
       # Each status buffer update happens in a transaction
       pipeline.multi do |transaction|
         key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
         transaction.del(key)
-        sb_hash = sb.to_hash
         transaction.mapped_hmset(key, sb_hash)
         # Expire time must be integer, we always round up
         transaction.expire(key, (3*OPTS[:delay]).ceil) if OPTS[:expire]
