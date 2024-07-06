@@ -502,19 +502,21 @@ def update_redis(redis, instance_ids, notify=false)
   # Pipeline all status buffer updates
   redis.pipelined do |pipeline|
     instance_ids.each do |iid|
+      # redis key for this instance's status buffer
+      key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
       sb = STATUS_BUFS[iid]
       sb_hash = sb.to_hash
-      if sb_hash.empty?
-        next
-      end
       # Each status buffer update happens in a transaction
       pipeline.multi do |transaction|
-        key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
-        transaction.del(key)
-        transaction.mapped_hmset(key, sb_hash)
+        # Delete status keys that no longer exist in buffer
+        status_keys_to_delete = existing_redis_status_keys - sb_hash.keys
+        status_keys_to_delete.each {|k| redis.hdel(key, k)}
+        # Set kv pairs, if any
+        transaction.mapped_hmset(key, sb_hash) unless sb_hash.empty?
         # Expire time must be integer, we always round up
         transaction.expire(key, (3*OPTS[:delay]).ceil) if OPTS[:expire]
-        if notify
+        # Only notify if desired and we deleted keys or set keys
+        if notify && !(status_keys_to_delete.empty? && sb_hash.empty?)
           # Publish "updated" method to notify subscribers
           channel = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/update"
           transaction.publish channel, key
