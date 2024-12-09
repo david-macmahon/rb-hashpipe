@@ -500,12 +500,15 @@ end
 #
 def update_redis(redis, instance_ids, notify=false)
   # Pipeline all status buffer updates
-  redis.pipelined do |pipeline|
-    instance_ids.each do |iid|
-      # redis key for this instance's status buffer
-      key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
-      sb = STATUS_BUFS[iid]
-      sb_hash = sb.to_hash
+  instance_ids.each do |iid|
+    # redis key for this instance's status buffer
+    key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
+    existing_redis_status_keys = redis.hkeys(key).to_set
+
+    sb = STATUS_BUFS[iid]
+    sb_hash = sb.to_hash
+    
+    redis.pipelined do |pipeline|
       # Each status buffer update happens in a transaction
       pipeline.multi do |transaction|
         # Delete status keys that no longer exist in buffer
