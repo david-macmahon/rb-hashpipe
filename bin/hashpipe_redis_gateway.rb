@@ -510,6 +510,15 @@ end
 # on its "update" channel (if +notify+ is true).
 #
 def update_redis(redis, instance_ids, notify=false)
+  # Get the keys currently in each instance's redis hash.  This must happen
+  # before the pipelined block below (where the values are needed to compute
+  # the stale keys to delete) since values read inside a pipeline block are
+  # not available until after the pipeline has been executed.
+  existing_redis_status_keys = {}
+  instance_ids.each do |iid|
+    key = "#{OPTS[:domain]}://#{OPTS[:gwname]}/#{iid}/status"
+    existing_redis_status_keys[iid] = redis.hkeys(key)
+  end
   # Pipeline all status buffer updates
   redis.pipelined do |pipeline|
     instance_ids.each do |iid|
@@ -520,8 +529,8 @@ def update_redis(redis, instance_ids, notify=false)
       # Each status buffer update happens in a transaction
       pipeline.multi do |transaction|
         # Delete status keys that no longer exist in buffer
-        status_keys_to_delete = existing_redis_status_keys - sb_hash.keys
-        status_keys_to_delete.each {|k| redis.hdel(key, k)}
+        status_keys_to_delete = existing_redis_status_keys[iid] - sb_hash.keys
+        status_keys_to_delete.each {|k| transaction.hdel(key, k)}
         # Set kv pairs, if any
         transaction.mapped_hmset(key, sb_hash) unless sb_hash.empty?
         # Expire time must be integer, we always round up
