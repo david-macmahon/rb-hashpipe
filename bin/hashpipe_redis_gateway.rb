@@ -359,6 +359,13 @@ subscribe_thread = Thread.new do
                     when %r{//[^/]+/([^/]+)/gateway}; [$1] # "unicast"
                     else OPTS[:instance_ids] # "broadcast" or "gateway"
                     end
+            # Normalize instance IDs to integers.  The unicast branch derives
+            # strings from the channel name while OPTS[:instance_ids] holds
+            # integers; Set#- and Set#+ match on eql?, so mixing the two
+            # representations makes join= and leave= silently no-ops against
+            # each other (e.g. a broadcast leave=array_1-0 removing nothing
+            # from a set populated by unicast joins).
+            insts = insts.map(&:to_i)
             group = v
             grset_channel = "#{OPTS[:domain]}:#{group}///set"
             puts "joining group #{group} for instances #{insts.inspect}"
@@ -378,6 +385,10 @@ subscribe_thread = Thread.new do
                     when %r{//[^/]+/([^/]+)/gateway}; [$1] # "unicast"
                     else OPTS[:instance_ids] # "broadcast" or "gateway"
                     end
+            # Normalize to integers for the same reason as in the join handler
+            # above: sets are keyed by eql?, so the subtraction must use the
+            # same representation that was added.
+            insts = insts.map(&:to_i)
             group = v
             grset_channel = "#{OPTS[:domain]}:#{group}///set"
             puts "leaving group #{group} for instances #{insts.inspect}"
